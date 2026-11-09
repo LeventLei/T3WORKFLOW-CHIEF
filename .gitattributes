@@ -1,0 +1,4 @@
+# 文本按 LF 存储；shell 脚本强制 LF，避免 Windows 检出后无法执行
+* text=auto eol=lf
+*.sh text eol=lf
+*.cmd text eol=crlf
