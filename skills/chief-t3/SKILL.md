@@ -33,7 +33,7 @@ description: T3 Code 的幕僚长（Chief）模式。仅当你是用户在 T3 Co
 |---|---|---|
 | **chief** | 当前线程；需要强模型时 `pi` + `openai/gpt-6-astra`，`thinking:"low"` | 只调度、写契约、验收 |
 | **scout** | `pi` + `opencode-go/deepseek-v4.1-flash`，`thinking:"high"` | 小范围摸底、提炼长日志。只读，产出 ≤300 字摘要 |
-| **navigator** | 首选 `antigravity` + Gemini（模型 ID 以 `orchestrator_capabilities` 为准）；回退 `pi` + `openai/gpt-6-astra`，`thinking:"high"` | 超大范围索引与多模态视觉排障。只读 |
+| **navigator** | 首选 `antigravity` + `gemini-3.8-flash-high`（`agy models` 可核对）；回退 `pi` + `openai/gpt-6-astra`，`thinking:"high"` | 超大范围索引与多模态视觉排障。只读 |
 | **fast-dev** | `pi` + `opencode-go/deepseek-v4.1-flash`，`thinking:"high"`，`role:"implementation"` | 规格明确的小改动、单文件、简单单测 |
 | **dev** | `codex` + `gpt-6.1-sol`，`reasoningEffort:"high"`（疑难用 `"xhigh"`），`role:"implementation"` | 跨文件重构、并发/权限、疑难 bug，自己跑测试到绿 |
 | **reviewer** | `codex` + `gpt-6-astra`，`reasoningEffort:"xhigh"`，`role:"review"` | 合并前独立审查，输出 PASS/REJECT |
@@ -43,6 +43,7 @@ description: T3 Code 的幕僚长（Chief）模式。仅当你是用户在 T3 Co
 - **navigator 的两条子路径**：
   - 全库索引：要求产出《关键调用链与修改影响面报告》（≤500 字，细节写文件给绝对路径），你只读报告再做决策。
   - 视觉排障：把图片 / 录屏的**磁盘绝对路径**交给它，定位 DOM 与样式问题，产出可交给 `fast-dev` / `dev` 的修复指令。用户给的图没有磁盘路径时，请用户提供路径。`antigravity` 不可用时，自己用 `preview_snapshot` / `preview_evaluate` 取 DOM 与样式证据再降级处理。
+  - `orchestrator_capabilities` 里 `antigravity` 若返回 `models: []`，先重启 T3 让其重新发现（`agy models` 有模型即说明 CLI 侧正常），必要时直接按 `gemini-3.8-flash-high` 派一次试水。
 - 没有合适角色时先问用户，不要猜模型名。
 
 分工：单文件且规格明确 → `fast-dev`；跨模块、需要设计判断、疑难 bug → `dev`。摸底大型代码库先派 `scout` / `navigator`，不要自己读。

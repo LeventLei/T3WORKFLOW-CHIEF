@@ -16,7 +16,7 @@
 | 角色 | target |
 |---|---|
 | scout（小范围摸底） | `pi` + `opencode-go/deepseek-v4.1-flash`，`thinking:"high"` |
-| navigator（大范围 / 视觉） | `antigravity` + Gemini；回退 `pi` + `openai/gpt-6-astra`，`thinking:"high"` |
+| navigator（大范围 / 视觉） | `antigravity` + `gemini-3.8-flash-high`；回退 `pi` + `openai/gpt-6-astra`，`thinking:"high"` |
 | fast-dev（小改动） | `pi` + `opencode-go/deepseek-v4.1-flash`，`thinking:"high"` |
 | dev（重活） | `codex` + `gpt-6.1-sol`，`reasoningEffort:"high"` |
 | reviewer（独立审查） | `codex` + `gpt-6-astra`，`reasoningEffort:"xhigh"`（不得与写代码的模型相同） |

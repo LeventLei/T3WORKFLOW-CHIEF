@@ -30,7 +30,7 @@ cd T3WORKFLOW-CHIEF
 |---|---|---|
 | chief | 当前线程（强模型：`pi` + `openai/gpt-6-astra`，`thinking:"low"`） | 拆单、写契约、验收，不写业务代码 |
 | scout | `pi` + `opencode-go/deepseek-v4.1-flash`，`thinking:"high"` | 小范围摸底，只读，≤300 字 |
-| navigator | 首选 `antigravity` + Gemini；回退 `pi` + `openai/gpt-6-astra` | 全库索引 / 多模态视觉排障，只读 |
+| navigator | 首选 `antigravity` + `gemini-3.8-flash-high`；回退 `pi` + `openai/gpt-6-astra` | 全库索引 / 多模态视觉排障，只读 |
 | fast-dev | `pi` + `opencode-go/deepseek-v4.1-flash`，`thinking:"high"` | 规格明确的小改动 |
 | dev | `codex` + `gpt-6.1-sol`，`reasoningEffort:"high"` / `"xhigh"` | 跨文件重构、并发权限、疑难 bug |
 | reviewer | `codex` + `gpt-6-astra`，`reasoningEffort:"xhigh"` | 合并前独立审查，PASS/REJECT |
@@ -54,7 +54,7 @@ cd T3WORKFLOW-CHIEF
 ## 已知差异
 
 1. **没有 profile 概念**：Paseo 用 `list_profiles` 一句带过，T3 每次派单都要写全 `providerInstanceId + model + options`，所以角色表固化在本仓库里。
-2. **navigator 的视觉能力取决于 `antigravity` 实例**：`orchestrator_capabilities` 里该 provider 返回 `models: []` 时无法指定模型，需先让 AGY 侧把模型列出来；否则退回 `preview_snapshot` 取证 + 让用户给图片绝对路径。
+2. **navigator 的视觉能力取决于 `antigravity` 实例是否把模型列出来**：CLI 侧 `agy models` 可列出 `gemini-3.8-flash-high` / `gemini-3.8-flash-medium` / `gemini-3.8-flash-low`；若 T3 的 `orchestrator_capabilities` 仍返回 `models: []`，重启 T3 重新发现，或直接按该 ID 试派一次。彻底不可用时退回 `preview_snapshot` 取证 + 用户提供图片绝对路径。
 3. **REJECT 不复用 Worker 上下文**：返工要靠 brief 里写清 findings，这也是 T3 官方推荐做法。
 4. **worktree 隔离要求项目本身是 git 仓库**。
 
