@@ -1,65 +1,67 @@
 # T3WORKFLOW-CHIEF
 
-在 **T3 Code** 里复刻 Paseo 的 **Chief（幕僚长）** 多 Agent 协作模式。
-原版依赖 Paseo MCP（`create_agent` / `send_agent_prompt` / `list_profiles`…），本仓库把它换成 T3 原生工具（`delegate_task` + 线程工具），角色、契约、审查规则保持不变。
-
-## 组成
-
-| 文件 | 作用 |
-|---|---|
-| `skills/chief-t3/SKILL.md` | 主配置：工具映射、角色表（provider/model/档位）、契约约定、独立审查、REJECT 流程、红线 |
-| `AGENTS.md` | 项目级入口模板：让该项目的新线程默认进入 Chief 模式 |
-| `templates/` | `HANDOFF.md` 与 `TASK-XX.md` / `.report.md` / `.review.md` 契约模板 |
-| `install.sh` | 一键把 skill 装到 `~/.agents/skills/chief-t3`，可选把 `AGENTS.md` 装进指定项目 |
+T3 Code 主线程的 Chief 工作流：拆单 → `delegate_task` → 独立审查 → 验收。被指定为 Worker 时自己完成，不再派单。
 
 ## 安装
 
+需要 Bash 与常用 coreutils / awk；Windows 使用 Git Bash。
+
 ```bash
-git clone https://github.com/ShawnWei0323/T3WORKFLOW-CHIEF.git
-cd T3WORKFLOW-CHIEF
-./install.sh /f/your-project      # 只装 skill 就省略路径参数
+cd /f/T3WORKFLOW-CHIEF
+bash install.sh                          # 只安装 skill
+bash install.sh "/f/project with spaces" # 同时集成项目 AGENTS 和台账
+# 可指定 skill 安装目录；不要指向源码 skill 目录
+CHIEF_SKILL_DIR="$HOME/.agents/skills/chief-t3" bash install.sh
 ```
 
-`~/.agents/skills/` 是 Pi 的默认 skill 扫描目录，装完即被发现。已开着的会话执行 `/reload`，或直接新开线程。
+默认安装到 `~/.agents/skills/chief-t3/`。已有线程按所用 provider 支持的方式重载技能；安装脚本不重启 T3、不启动新线程或派单。
 
-## 角色表
+安装前校验参数、完整源文件、目标路径和现有 AGENTS 标记结构，校验失败不写入。逐文件更新 skill，不清空目标，不删除额外文件；变更前备份到目标中的 `.chief-t3-backup.*` 目录。相同内容重复安装不改文件、不增加备份。源目标相同或嵌套、符号链接、文件 / 目录类型冲突会拒绝安装。
 
-派单前先跑 `orchestrator_capabilities` 校验 provider/model 是否仍存在（provider 会停用、模型会改名）。
+项目目录必须已经存在。已有 AGENTS 中，**只替换 `<!-- chief-t3:begin -->` 到 `<!-- chief-t3:end -->` 标记区**；没有标记则保留原文并追加 Chief 区，不整体覆盖。写入前生成 `AGENTS.md.bak.*` 备份，保留已有 HANDOFF。已有未标记的旧 Chief 规则不会被自动删除；若存在旧模型或规则冲突，应比较备份，明确归属后合并。文本集成会补齐行末换行。文件系统 I/O 故障仍可能留下部分已安装内容或暂存文件，需按日志和备份处理，脚本不自动破坏性回滚。
 
-| 角色 | target | 职责 |
-|---|---|---|
-| chief | 当前线程（强模型：`pi` + `openai/gpt-6-astra`，`thinking:"low"`） | 拆单、写契约、验收，不写业务代码 |
-| scout | `pi` + `opencode-go/deepseek-v4.1-flash`，`thinking:"high"` | 小范围摸底，只读，≤300 字 |
-| navigator | 首选 `antigravity` + `gemini-3.8-flash-high`；回退 `pi` + `openai/gpt-6-astra` | 全库索引 / 多模态视觉排障，只读 |
-| fast-dev | `pi` + `opencode-go/deepseek-v4.1-flash`，`thinking:"high"` | 规格明确的小改动 |
-| dev | `codex` + `gpt-6.1-sol`，`reasoningEffort:"high"` / `"xhigh"` | 跨文件重构、并发权限、疑难 bug |
-| reviewer | `codex` + `gpt-6-astra`，`reasoningEffort:"xhigh"` | 合并前独立审查，PASS/REJECT |
-| architect | `codex` + `gpt-6-astra`，`reasoningEffort:"xhigh"` | 仅 S 级立项，产出 `SPEC.md` |
-| 文档工作 | `pi` + `opencode-go/deepseek-v4.1-flash`，`thinking:"low"` | 把难读的文档改成人话 |
+## 文件
 
-规则要点：**写代码的 Worker 不审自己**（dev=`sol` / reviewer=`astra` 即合规）；并行写代码 ≤3 个；超过 2 个文件或规格不清才写契约。
-
-## Paseo 对照
-
-| Paseo | T3 Code |
+| 文件 | 用途 |
 |---|---|
-| `create_agent(profile)` | `delegate_task{target:{…}}` |
-| `create_workspace` | `delegate_task{isolation:"worktree"}` |
-| `notifyOnFinish` | 完成时唤醒；`mode:"wait"` / `task_status` |
-| `get_agent_activity` | `t3_thread_read view:"activity"` |
-| `archive_agent` | `t3_thread_organize settle/archive` |
-| `send_agent_prompt`（REJECT 复用上下文） | **重新 `delegate_task`** 并把 findings 写进 brief（子 Agent 无父历史） |
-| `~/.paseo-tasks/<proj>/` | `~/.t3-tasks/<proj>/`（文件约定不变） |
+| `skills/chief-t3/SKILL.md` | Chief 规则与工作流 |
+| `skills/chief-t3/templates/` | 权威模板，随 skill 安装；从 SKILL.md 所在目录相对解析 |
+| `templates/` | 仓库入口的兼容模板副本，与打包模板保持一致 |
+| `AGENTS.md` | 受管理的项目入口区块，区外保留用户规则 |
+| `install.sh` | 校验、备份、安装、集成项目规则与初始化缺失台账 |
 
-## 已知差异
+安装后的 skill 和模板独立可用，不需要原仓库仍在磁盘。项目台账为 `~/.t3-tasks/<project>/`，契约、报告、审查与输入用绝对路径传递。
 
-1. **没有 profile 概念**：Paseo 用 `list_profiles` 一句带过，T3 每次派单都要写全 `providerInstanceId + model + options`，所以角色表固化在本仓库里。
-2. **navigator 的视觉能力取决于 `antigravity` 实例是否把模型列出来**：CLI 侧 `agy models` 可列出 `gemini-3.8-flash-high` / `gemini-3.8-flash-medium` / `gemini-3.8-flash-low`；若 T3 的 `orchestrator_capabilities` 仍返回 `models: []`，重启 T3 重新发现，或直接按该 ID 试派一次。彻底不可用时退回 `preview_snapshot` 取证 + 用户提供图片绝对路径。
-3. **REJECT 不复用 Worker 上下文**：返工要靠 brief 里写清 findings，这也是 T3 官方推荐做法。
-4. **worktree 隔离要求项目本身是 git 仓库**。
+## 角色
 
-## 环境要求
+每线程首次 `delegate_task` 前一次 `orchestrator_capabilities`；仅错误或用户指定 provider 变化后重查。使用返回的实例与准确模型 ID；延迟工具先尝试 / 搜索再认定缺失。设置写在 `target.options`，Worker `role` 是 `delegate_task` 顶层字段。
 
-- T3 Code（服务端与本机 `t3` CLI 已就绪）
-- 可用的 provider：`pi`、`deepseek-harness`、`codex`；`antigravity` 可选
-- git + bash（Windows 上用 Git Bash 跑 `install.sh`）
+| 角色 | provider / model / target.options | 用途 |
+|---|---|---|
+| chief | 当前线程 | 拆单、契约、验收 |
+| scout / fast-dev | `pi` / `opencode-go/deepseek-v4.1-flash` / `{"thinking":"high"}` | 摸底 / 小改动 |
+| navigator | 首选 `antigravity` / `gemini-3.8-flash-high`；已授权 fallback：`codex` / `gpt-6.1-sol` / `{"reasoningEffort":"high"}` | 大范围 / 视觉分析 |
+| dev | `codex` / `gpt-6.1-sol` / `{"reasoningEffort":"high"}` | 跨文件实现与验证 |
+| reviewer | `codex` / `gpt-6-astra` / `{"reasoningEffort":"xhigh"}` | 独立审查，必须与实现模型不同 |
+| architect | `codex` / `gpt-6-astra` / `{"reasoningEffort":"xhigh"}` | S 级架构方案 |
+| 文档工作 | `pi` / `opencode-go/deepseek-v4.1-flash` / `{"thinking":"low"}` | 文档整理 |
+
+navigator 首选不可用（含缺失、空模型列表或调用错误）时，可以使用用户已明确授权的 **Codex Sol/high fallback**，先核对其可用性；fallback 也不可用则报告，请用户决定，不再换其他模型。其他角色目标不可用也不得擅自替换；不自动重启、不猜模型试派。浏览器只能用于用户当次请求的浏览器工作，不能作模型失败后的自动降级。
+
+## T3 执行要点
+
+- 委派后严格遵循返回的 `next`。运行中不查 `task_status`、不 sleep、不轮询；只有完成唤醒后读取 `task_status`。`t3_background_wait` 仅 Claude 可用。结束当前回合等通知不表示完成交付。
+- 替换或不再需要的运行任务先 `task_cancel`，不 interrupt 子线程。长期任务不授权创建顶层线程；`t3_thread_launch` / `create_threads` 必须有用户明确的新线程请求。
+- worktree 通过平台 `isolation:"worktree"` 创建，派单前未知其路径；要求 Worker 使用分配目录并报告真实路径，不编造路径、不用 shell 建 worktree。父目录未提交改动不会复制；依赖这些输入时明确快照策略或经授权使用 shared。非 Git 项目不自动初始化；shared 使用明确授权的实际目录，不能把主线程父目录当作仓库。
+- 每次 review / recheck 都新 `delegate_task`，且与实现模型不同。readonly 指令不保证技术只读；审查前保存 tracked / untracked / 内容基线，审查后对比。异常先停下报告，明确归属，不盲目 reset / checkout 或删除用户文件。
+- 小审查修复由主线程直接做。大返工可新派任务或 `t3_thread_send` 续原开发子线程；T3 支持续会话，但新的独立复查必须新派，不能续旧审查。
+- 需要等 PR 时用 `watch_pull_request`；工具不支持就报告，不轮询替代。
+- 合并、提交、推送、删除及未授权外部写入须有明确授权；已授权的可逆编辑直接完成。
+
+## 验证
+
+```bash
+bash -n install.sh
+```
+
+安装回归在临时目录隔离 HOME 与 CHIEF_SKILL_DIR，覆盖已有文件和备份、无效参数零写入、空格路径、源目标冲突、自包含模板、重复安装与 AGENTS 用户内容保留；不需要真实派单或浏览器。

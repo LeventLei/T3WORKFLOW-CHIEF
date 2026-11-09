@@ -1,25 +1,22 @@
 # TASK-XX review
 
-结论：`PASS` | `REJECT`
+结论：PASS / REJECT / BLOCKED（未完成验证不能写 PASS）
 
-审查者模型：`codex/gpt-6-astra (xhigh)` —— 必须与写代码的模型不同。
+- 审查模型：codex/gpt-6-astra，options.reasoningEffort:"xhigh"；必须与实现模型不同。
+- 本次审查 / 复查：新 delegate_task，不续旧 review 会话。
+- 契约、真实被审目录、变更范围与验收命令：
 
-## 依据
+## 审查前后基线
 
-- 契约：`TASK-XX.md`
-- diff：`git diff --name-only` 结果
-- 验收命令结果：
+- readonly 是任务指令，不保证技术只读。
+- 主线程审查前记录 tracked、staged / unstaged diff、untracked 清单及内容快照 / 哈希的绝对路径：
+- 审查后与基线对比；仅允许写入指定报告。意外差异、归属及后续处理：
+- 意外修改先停下报告，不盲目 git reset / checkout、不删除用户文件。
 
-## 越界检查
+## 证据与问题
 
-- [ ] 改动文件全部在 Scope 内
-- [ ] 没有顺手改动无关文件 / 格式化噪音
-- [ ] 断言没有靠改测试通过
+检查 Scope（含 untracked）、行为、相关验证；问题写文件:行、影响、证据和建议。
 
-## 问题清单（REJECT 时必填）
+## 返工建议
 
-1. 文件:行 —— 问题 —— 期望
-
-## 给开发 Worker 的返工指令
-
-（若 REJECT：写成可以直接作为新 `delegate_task` brief 的文字，不要引用会话上下文）
+小修主线程直接做；较大返工可新派开发任务或 thread_send 续原开发会话。提供完整 findings 与 objections，不宣称 T3 无法复用会话。修复后的独立复查一律新 delegate_task。
