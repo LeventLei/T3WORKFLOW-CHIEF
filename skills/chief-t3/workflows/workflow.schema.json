@@ -1,0 +1,201 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/ShawnWei0323/T3WORKFLOW-CHIEF/workflow.schema.json",
+  "title": "Chief workflow",
+  "description": "Chief 工作流的可编辑部分：角色到模型的映射、阶段开关与数量上限。等待、审查独立性、授权等硬规则在 SKILL.md 中，不可配置。",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schemaVersion",
+    "name",
+    "roles",
+    "stages",
+    "limits"
+  ],
+  "properties": {
+    "$schema": {
+      "type": "string"
+    },
+    "schemaVersion": {
+      "const": 1
+    },
+    "name": {
+      "type": "string",
+      "pattern": "^[a-z0-9][a-z0-9-]*$"
+    },
+    "title": {
+      "type": "string",
+      "description": "显示名称，可用中文"
+    },
+    "description": {
+      "type": "string"
+    },
+    "roles": {
+      "type": "object",
+      "minProperties": 1,
+      "propertyNames": {
+        "pattern": "^[a-z0-9][a-z0-9-]*$"
+      },
+      "additionalProperties": {
+        "$ref": "#/$defs/role"
+      }
+    },
+    "stages": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "$ref": "#/$defs/stage"
+      }
+    },
+    "limits": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "maxParallelWriters",
+        "maxReworkRounds",
+        "contractFileThreshold"
+      ],
+      "properties": {
+        "maxParallelWriters": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 8,
+          "description": "同时写代码的 Worker 上限"
+        },
+        "maxReworkRounds": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 5,
+          "description": "同一问题返工轮数上限，超过后请用户决定"
+        },
+        "contractFileThreshold": {
+          "type": "integer",
+          "minimum": 0,
+          "description": "改动文件数超过此值时必须写契约"
+        }
+      }
+    }
+  },
+  "$defs": {
+    "target": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "provider",
+        "model",
+        "options"
+      ],
+      "properties": {
+        "provider": {
+          "type": "string",
+          "minLength": 1,
+          "description": "providerInstanceId 的约定目标，派单时以 orchestrator_capabilities 实际返回为准"
+        },
+        "model": {
+          "type": "string",
+          "minLength": 1,
+          "description": "准确模型 ID"
+        },
+        "options": {
+          "type": "object",
+          "description": "原样放入 delegate_task 的 target.options；不得包含 role",
+          "not": {
+            "required": [
+              "role"
+            ]
+          }
+        }
+      }
+    },
+    "role": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "purpose",
+        "delegateRole",
+        "access",
+        "target",
+        "fallbacks"
+      ],
+      "properties": {
+        "label": {
+          "type": "string"
+        },
+        "purpose": {
+          "type": "string",
+          "minLength": 1
+        },
+        "delegateRole": {
+          "enum": [
+            "implementation",
+            "research",
+            "review",
+            "design",
+            "test",
+            "general"
+          ],
+          "description": "delegate_task 顶层 role 字段"
+        },
+        "access": {
+          "enum": [
+            "readonly",
+            "write"
+          ]
+        },
+        "reportLimit": {
+          "type": "integer",
+          "minimum": 50,
+          "description": "汇报字数上限"
+        },
+        "target": {
+          "$ref": "#/$defs/target"
+        },
+        "fallbacks": {
+          "type": "array",
+          "description": "用户已明确授权的回退目标，按顺序尝试；列表之外不得替换",
+          "items": {
+            "$ref": "#/$defs/target"
+          }
+        }
+      }
+    },
+    "stage": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "id",
+        "enabled",
+        "required",
+        "roles"
+      ],
+      "properties": {
+        "id": {
+          "enum": [
+            "recon",
+            "design",
+            "implement",
+            "review"
+          ]
+        },
+        "enabled": {
+          "type": "boolean"
+        },
+        "required": {
+          "type": "boolean",
+          "description": "true 时每个任务都必须经过该阶段"
+        },
+        "roles": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "type": "string"
+          },
+          "description": "可用于该阶段的角色键，必须存在于 roles"
+        },
+        "note": {
+          "type": "string"
+        }
+      }
+    }
+  }
+}

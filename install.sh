@@ -8,14 +8,23 @@ die() { printf 'Error: %s\n' "$*" >&2; exit 1; }
 [[ $# -eq 0 || -n $1 ]] || die 'project directory must not be empty'
 [[ -n ${HOME:-} ]] || die 'HOME must not be empty'
 [[ -n ${CHIEF_SKILL_DIR-unset} ]] || die 'CHIEF_SKILL_DIR must not be empty'
-for command_name in realpath dirname basename awk cmp cp mkdir mktemp mv iconv tr; do
+for command_name in realpath dirname basename awk cmp cp mkdir mktemp mv tr; do
   command -v "$command_name" >/dev/null || die "missing command: $command_name"
 done
+# macOS iconv rejects valid UTF-8 split across its ~4KB read buffer, so prefer perl
+# (bundled with macOS and Git for Windows) and keep iconv only as a fallback.
+if command -v perl >/dev/null && perl -MEncode -e 1 2>/dev/null; then
+  is_utf8() { perl -MEncode -e 'local $/; my $s = <STDIN>; Encode::decode("UTF-8", $s, Encode::FB_CROAK); 1' < "$1" 2>/dev/null; }
+elif command -v iconv >/dev/null; then
+  is_utf8() { iconv -f UTF-8 -t UTF-8 "$1" >/dev/null 2>&1; }
+else
+  die 'missing command: perl or iconv'
+fi
 
 REPO_DIR="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd -P)"
 SKILL_SRC="$REPO_DIR/skills/chief-t3"
 AGENTS_SRC="$REPO_DIR/AGENTS.md"
-PAYLOAD=(SKILL.md templates/HANDOFF.md templates/TASK.md templates/TASK.report.md templates/TASK.review.md)
+PAYLOAD=(SKILL.md workflows/default.json workflows/workflow.schema.json templates/HANDOFF.md templates/TASK.md templates/TASK.report.md templates/TASK.review.md)
 BEGIN_MARK='<!-- chief-t3:begin -->'
 END_MARK='<!-- chief-t3:end -->'
 
@@ -40,8 +49,27 @@ canonical() {
   esac
   # Check before realpath so a symlink cannot be hidden by canonicalization.
   check_components "$path"
-  realpath -m -- "$path"
+  if [[ $HAVE_REALPATH_M == 1 ]]; then realpath -m -- "$path"; else normalize "$path"; fi
 }
+# macOS (BSD) realpath has no -m. Components were already checked to be
+# symlink-free, so lexical normalization gives the same result there.
+normalize() {
+  local path="$1" part out=""
+  [[ $path == /* ]] || path="$(pwd -P)/$path"
+  local -a raw=() parts=()
+  IFS=/ read -r -a raw <<< "$path"
+  for part in ${raw[@]+"${raw[@]}"}; do
+    case "$part" in
+      ''|.) ;;
+      ..) if [[ ${#parts[@]} -gt 1 ]]; then parts=("${parts[@]:0:${#parts[@]}-1}"); else parts=(); fi ;;
+      *) parts+=("$part") ;;
+    esac
+  done
+  for part in ${parts[@]+"${parts[@]}"}; do out="$out/$part"; done
+  printf '%s\n' "${out:-/}"
+}
+HAVE_REALPATH_M=0
+realpath -m -- / >/dev/null 2>&1 && HAVE_REALPATH_M=1
 validate_dir() {
   local path="$1"
   check_components "$path"
@@ -72,7 +100,7 @@ filesystem_root() {
 # Managed text must be UTF-8 without NUL bytes. Reject UTF-16/32 and
 # malformed input before any destination, backup, or ledger is written.
 validate_utf8() {
-  iconv -f UTF-8 -t UTF-8 "$1" >/dev/null 2>&1 || die "expected UTF-8 text: $1"
+  is_utf8 "$1" || die "expected UTF-8 text: $1"
   cmp -s -- "$1" <(LC_ALL=C tr -d '\000' < "$1") || die "NUL bytes / UTF-16 or UTF-32 are not supported: $1"
 }
 

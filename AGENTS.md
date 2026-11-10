@@ -9,19 +9,13 @@
 
 **被指定为 Worker 时自己完成，不派子 Agent。** 用户要求“你自己改”、少量配置修改及小审查修复由主线程直接做。
 
-## 角色
+## 角色与工作流配置
 
-每线程首次 `delegate_task` 前查一次 `orchestrator_capabilities`；仅错误或用户指定 provider 变化后重查。延迟工具先尝试 / 搜索再断言缺失。providerInstanceId 与 model 使用实际能力；设置放 `target.options`，`role` 放派单顶层。
+每线程首次 `delegate_task` 前查一次 `orchestrator_capabilities`；仅错误或用户指定 provider 变化后重查。延迟工具先尝试 / 搜索再断言缺失。
 
-| 角色 | provider / model / options |
-|---|---|
-| scout / fast-dev | `pi` / `opencode-go/deepseek-v4.1-flash` / `thinking:"high"` |
-| navigator | 首选 `antigravity` / `gemini-3.8-flash-high`；已授权 fallback：`codex` / `gpt-6.1-sol` / `reasoningEffort:"high"` |
-| dev | `codex` / `gpt-6.1-sol` / `reasoningEffort:"high"` |
-| reviewer | `codex` / `gpt-6-astra` / `reasoningEffort:"xhigh"`，与实现模型不同 |
-| architect | `codex` / `gpt-6-astra` / `reasoningEffort:"xhigh"` |
+角色、模型、`target.options`、已授权 fallback、阶段开关和数量上限来自工作流配置，按顺序取第一个存在的：用户本次点名的文件或工作流名称 → `~/.t3-tasks/<project>/workflow.json`（可以是完整配置，也可以是 `{"use":"<名称>"}`，指向 `~/.chief-t3/workflows/<名称>.json`）→ skill 目录的 `workflows/default.json`。配置无效时报告并停止派单，不猜测、不回退。`role` 放派单顶层，不进 `target.options`。
 
-navigator 首选不可用时可用上述用户已授权的 Sol/high fallback；fallback 也不可用则报告并请求决定，不擅自再换模型。其他目标不可用或模型列表为空也须报告，不猜测试派、重启或自动改用浏览器。
+目标不可用或模型列表为空时只按配置里的 `fallbacks` 回退；都不可用则报告并请求决定，不猜测试派、重启或自动改用浏览器。reviewer 模型必须与实现模型不同。
 
 ## 执行边界
 

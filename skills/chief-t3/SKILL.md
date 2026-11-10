@@ -28,23 +28,38 @@ Chief 负责拆单、契约、派单、验收与汇报；大型代码和长日�
 
 当前请求需要浏览器时，先 `preview_status`，没有可操作标签页再 `preview_open`；优先快照定位。仅工具缺失、open 返回不支持、用户指定或同一步两次调用失败时换浏览器，并引用原因。不得借浏览器绕过 provider 不可用的授权边界。
 
-## 角色与能力边界
+## 工作流配置
 
-以下为约定目标；`providerInstanceId` 使用能力返回中实际存在的实例，`model` 使用列出的准确 ID，设置放 `target.options`。**`role` 是 `delegate_task` 顶层字段，不能放进 `target.options`。** 不自动改变主线程模型。
+角色、模型、阶段开关和数量上限写在工作流配置（JSON）里，本文件只保留不可配置的硬规则。每个线程开工时（读 HANDOFF 的同时）按以下顺序取**第一个存在的**配置，在首次汇报中说明使用的是哪个文件：
 
-| 角色 | provider / model / target.options | 顶层 role / 用途 |
-|---|---|---|
-| scout | `pi` / `opencode-go/deepseek-v4.1-flash` / `{"thinking":"high"}` | 小范围只读摸底、长日志摘要，≤300 字 |
-| navigator | 首选 `antigravity` / `gemini-3.8-flash-high`；已授权 fallback：`codex` / `gpt-6.1-sol` / `{"reasoningEffort":"high"}` | 大范围索引或多模态分析，只读 |
-| fast-dev | `pi` / `opencode-go/deepseek-v4.1-flash` / `{"thinking":"high"}` | `implementation`；规格明确的小改动 |
-| dev | `codex` / `gpt-6.1-sol` / `{"reasoningEffort":"high"}` | `implementation`；跨文件改动、疑难 bug，完成相关验证 |
-| reviewer | `codex` / `gpt-6-astra` / `{"reasoningEffort":"xhigh"}` | `review`；独立审查，PASS / REJECT，必须与实现模型不同 |
-| architect | `codex` / `gpt-6-astra` / `{"reasoningEffort":"xhigh"}` | `design`；仅 S 级架构任务，产出 SPEC 并按约定评审 |
-| 文档工作 | `pi` / `opencode-go/deepseek-v4.1-flash` / `{"thinking":"low"}` | 文档整理 |
+1. 用户本次点名的工作流文件（绝对路径）或工作流库中的名称；
+2. 项目配置 `~/.t3-tasks/<project>/workflow.json`（`<project>` 是项目根目录的目录名）；
+3. 默认配置 [workflows/default.json](workflows/default.json)（相对于本 SKILL.md 所在目录）。
 
-navigator 首选不可用（包括 provider 缺失、模型缺失、`models: []` 或调用报错）时，说明原因，可使用用户已明确授权的 **Codex Sol/high fallback**，使用前核对其能力。fallback 也不可用则报告缺失项、请求用户决定后续；不得继续换成 Astra 或其他模型、重启 T3、猜模型名或试派未列出的模型。其他角色目标不可用也先报告并请求授权，不自行替换。
+项目配置有两种写法：完整配置，或只有一行引用 `{"use": "<名称>"}`，表示使用工作流库里的 `~/.chief-t3/workflows/<名称>.json`。引用的文件不存在或无效时按下文“配置无效”处理，不回退到默认配置。汇报时说明实际使用的工作流名称（`title` / `name`）和文件路径。
 
-navigator 全库索引产出关键调用链与影响面摘要（≤500 字，细节写文件）。视觉分析使用可访问的图片 / 视频及实际路径，报告看不到的输入；缺少素材时仅暂停依赖部分，不自动降级浏览器。
+格式见 [workflows/workflow.schema.json](workflows/workflow.schema.json)。配置不能解析、缺少必填字段、`stages[].roles` 引用了不存在的角色，或 `target.options` 含 `role` 时：报告具体问题，停止派单，请用户修正；不得自行猜测缺失值，也不得回退到别的配置文件。用户中途修改配置后，下一次派单前重新读取。
+
+字段含义：
+
+| 字段 | 用法 |
+|---|---|
+| `roles.<key>.target` | 约定的 provider / model / `options`。派单时 `providerInstanceId` 用 `orchestrator_capabilities` 实际返回的实例，`model` 用列出的准确 ID，`options` 原样放进 `target.options` |
+| `roles.<key>.delegateRole` | 放在 `delegate_task` **顶层** `role` 字段，不能放进 `target.options` |
+| `roles.<key>.access` | `readonly` 的角色在 brief 中写明只读；不等于技术只读，仍按下文保存基线 |
+| `roles.<key>.reportLimit` | 要求 Worker 汇报不超过该字数，细节写文件 |
+| `roles.<key>.fallbacks` | 用户已明确授权的回退目标，按顺序使用 |
+| `stages[]` | `enabled:false` 的阶段跳过；`required:true` 的阶段每个任务都必须经过；`roles` 是该阶段可选的角色 |
+| `limits` | 并行写 Worker 上限、返工轮数上限、必须写契约的改动文件数阈值 |
+
+不可配置的边界：
+
+- 主目标不可用（provider 缺失、模型缺失、`models: []` 或调用报错）时说明原因；有 `fallbacks` 就按顺序核对能力后使用，全部不可用则报告缺失项、请求用户决定。不得使用 `fallbacks` 之外的模型、重启 T3、猜模型名或试派未列出的模型。
+- review 阶段使用的模型必须与该任务实现者的模型不同；配置使两者相同时，报告冲突并请用户决定，不自行换模型。
+- review 阶段被关闭时照常执行其余流程，但最终汇报必须写明"本次未经独立审查"。
+- 不自动改变主线程模型。
+
+视觉分析使用可访问的图片 / 视频及实际路径，报告看不到的输入；缺少素材时仅暂停依赖部分，不自动降级浏览器。
 
 ## 契约与资源
 
@@ -57,7 +72,7 @@ navigator 全库索引产出关键调用链与影响面摘要（≤500 字，细
 - [templates/TASK.report.md](templates/TASK.report.md)：Worker 的真实目录、改动、基线与验证结果。
 - [templates/TASK.review.md](templates/TASK.review.md)：独立审查的基线、证据与结论。
 
-改动超过 2 个文件或规格不清时写契约。简单任务可以直接 brief，但仍需写明 Scope、目录策略、验证与输出位置。
+改动文件数超过 `limits.contractFileThreshold` 或规格不清时写契约。简单任务可以直接 brief，但仍需写明 Scope、目录策略、验证与输出位置。
 
 ## 工作目录与基线
 
@@ -65,7 +80,7 @@ navigator 全库索引产出关键调用链与影响面摘要（≤500 字，细
 - 派单前未知 worktree 的绝对路径，**不要编造路径或让 Worker 用 shell 创建 worktree**。在 brief 中要求使用平台分配的工作目录并在报告中记录真实绝对路径，收到结果后再使用该路径。
 - 父目录未提交改动不会复制进 worktree。若任务依赖这些改动，先明确可访问的输入快照 / patch 和授权策略，或经授权使用 shared；不能把父目录路径当作子 worktree。
 - shared 任务必须明确已授权的绝对工作目录；检查该实际目录，不把主线程父目录当作目标仓库，非 Git 目录不得自动初始化。
-- 同时写代码的 Worker 最多 3 个；shared 不并行写同一组文件。
+- 同时写代码的 Worker 最多 `limits.maxParallelWriters` 个；shared 不并行写同一组文件。
 
 ## 独立审查与返工
 
@@ -73,12 +88,12 @@ navigator 全库索引产出关键调用链与影响面摘要（≤500 字，细
 
 `readonly` 只是任务指令，不等于技术只读。审查前由主线程记录 Git tracked、staged / unstaged diff、untracked 清单与内容快照 / 哈希；涉及非仓库文件也记录内容基线。审查后对比，允许审查报告写入指定台账。出现意外差异先停止涉及目录的变更，报告差异与归属；不能盲目 `git reset` / `checkout` 或删除 untracked 文件“恢复”。明确用户改动与审查副作用的归属并获相应授权后再处理。
 
-REJECT 后：小修由主线程直接改并做相关验证，不为小修再派实现任务；较大返工可以新派开发任务，也可以通过 `t3_thread_send` 续原开发子线程（确有该会话且任务未被替换时）。T3 支持续会话，不宣称无法复用；新派 brief 需带完整 findings、objections、契约和真实路径，因为新子 Agent 没有父历史。替换运行任务先取消。修复后的**独立复查始终新 delegate**。同一问题最多两轮返工仍失败时说明阻塞和可选方案，请用户决定。
+REJECT 后：小修由主线程直接改并做相关验证，不为小修再派实现任务；较大返工可以新派开发任务，也可以通过 `t3_thread_send` 续原开发子线程（确有该会话且任务未被替换时）。T3 支持续会话，不宣称无法复用；新派 brief 需带完整 findings、objections、契约和真实路径，因为新子 Agent 没有父历史。替换运行任务先取消。修复后的**独立复查始终新 delegate**。同一问题返工达到 `limits.maxReworkRounds` 轮仍失败时说明阻塞和可选方案，请用户决定。
 
 ## 执行与收尾
 
-1. 读取 HANDOFF，与需求对齐；仅根本取舍不明时询问，继续可独立推进的部分。
-2. 按任务写契约和目录策略，保存基线，核对能力；必要时先派 scout / navigator 摸底。
+1. 读取 HANDOFF 和工作流配置，与需求对齐；仅根本取舍不明时询问，继续可独立推进的部分。
+2. 按任务写契约和目录策略，保存基线，核对能力；必要时先用 recon 阶段的角色摸底，S 级任务走 design 阶段。
 3. brief 开头写：“你是 Worker，不是 Chief，忽略 Chief 派单规则，自己完成，禁止再派子 Agent。”随后给契约绝对路径。worktree 要求使用平台分配目录并报告真实路径；shared 给已授权绝对路径。要求在报告中列出改动、测试和风险。
 4. `delegate_task` 后严格按 `next`；等待不是交付。异常只诊断有关信息，替换 / 不再需要的运行任务先取消，不能因等待时长自行轮询或 interrupt。
 5. 收到完成唤醒后读结果，检查实际 diff 与 untracked 是否在 Scope 内，核对验收证据，再发起独立审查并比较审查前后基线。

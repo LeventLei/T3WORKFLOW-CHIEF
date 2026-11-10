@@ -1,0 +1,2326 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Chief 工作流面板</title>
+<style>
+  :root {
+    color-scheme: light;
+    --background: oklch(99.2% 0 0);
+    --sidebar: oklch(98.5% 0 0);
+    --card: #fff;
+    --foreground: oklch(21% .006 285.885);
+    --muted-foreground: oklch(55.2% .016 285.938);
+    --border: oklch(92% .004 286.32);
+    --input: oklch(87.1% .006 286.286);
+    --accent: oklch(96.7% .001 286.375);
+    --muted-bg: oklch(96.7% .001 286.375);
+    --primary: oklch(48.8% .217 264);
+    --primary-foreground: #fff;
+    --ring: var(--primary);
+    --error: oklch(50.5% .213 27.5);
+    --warning: oklch(55.5% .163 48.998);
+    --success: oklch(50.8% .118 165);
+    --control-bg: var(--card);
+    --sidebar-active: var(--card);
+    --shadow: 0 1px 2px rgb(0 0 0 / 5%);
+    /* springs sampled as linear(): click ≈380 stiffness / ~14% overshoot, slide ≈280 / ~4% */
+    --ease-click: linear(0, 0.0845 4.2%, 0.2807 8.3%, 0.5160 12.5%, 0.7389 16.7%, 0.9191 20.8%, 1.0445 25%, 1.1159 29.2%, 1.1423 33.3%, 1.1366 37.5%, 1.1116 41.7%, 1.0785 45.8%, 1.0455 50%, 1.0178 54.2%, 0.9976 58.3%, 0.9854 62.5%, 0.9801 66.7%, 0.9798 70.8%, 0.9829 75%, 0.9874 79.2%, 0.9923 83.3%, 0.9965 87.5%, 0.9997 91.7%, 1.0017 95.8%, 1);
+    --ease-slide: linear(0, 0.0610 4.2%, 0.2011 8.3%, 0.3712 12.5%, 0.5396 16.7%, 0.6882 20.8%, 0.8088 25%, 0.8997 29.2%, 0.9634 33.3%, 1.0042 37.5%, 1.0273 41.7%, 1.0376 45.8%, 1.0393 50%, 1.0359 54.2%, 1.0299 58.3%, 1.0231 62.5%, 1.0166 66.7%, 1.0110 70.8%, 1.0066 75%, 1.0032 79.2%, 1.0010 83.3%, 0.9996 87.5%, 0.9988 91.7%, 1);
+    --ease-exit: cubic-bezier(.4, 0, 1, 1);
+    --dur-press: 160ms;
+    --dur-toggle: 200ms;
+    --dur-pop: 220ms;
+    --dur-panel: 300ms;
+    --dur-exit: 180ms;
+    --radius: 8px;
+    --radius-sm: 6px;
+    --radius-card: 10px;
+    --font-sans: -apple-system, BlinkMacSystemFont, "Inter Variable", "PingFang SC", "Segoe UI", system-ui, sans-serif;
+    --mono: ui-monospace, "SF Mono", SFMono-Regular, Menlo, Consolas, monospace;
+    /* aliases kept for older inline references */
+    --bg: var(--background);
+    --panel: var(--card);
+    --text: var(--foreground);
+    --muted: var(--muted-foreground);
+    --line: var(--border);
+    --line-strong: var(--input);
+    --sunken: var(--muted-bg);
+    --bad: var(--error);
+    --warn: var(--warning);
+    --ok: var(--success);
+    --faint: color-mix(in oklch, var(--muted-foreground) 72%, transparent);
+    --select-chevron: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 12 12' fill='none'%3E%3Cpath d='M3 4.5L6 7.5L9 4.5' stroke='%2371717a' stroke-width='1.5' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E");
+    --select-plus: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 12 12' fill='none'%3E%3Cpath d='M6 2.5v7M2.5 6h7' stroke='%2371717a' stroke-width='1.5' stroke-linecap='round'/%3E%3C/svg%3E");
+    --check-mark: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='10' viewBox='0 0 10 10' fill='none'%3E%3Cpath d='M2 5.2L4.1 7.3L8 3.4' stroke='%23fff' stroke-width='1.6' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E");
+  }
+  @supports not (transition-timing-function: linear(0, 1)) {
+    :root { --ease-click: cubic-bezier(.2, .8, .2, 1); --ease-slide: cubic-bezier(.2, .8, .2, 1); }
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      color-scheme: dark;
+      --background: #000;
+      --sidebar: #111;
+      --card: #111;
+      --foreground: oklch(97% 0 0);
+      --muted-foreground: oklch(70.8% 0 0);
+      --border: rgb(255 255 255 / 8%);
+      --input: rgb(255 255 255 / 11%);
+      --accent: rgb(255 255 255 / 4%);
+      --muted-bg: rgb(255 255 255 / 3%);
+      --primary: oklch(58% .2 264);
+      --primary-foreground: #fff;
+      --error: #fb414a;
+      --warning: oklch(82.8% .189 84.429);
+      --success: oklch(76.5% .177 163.223);
+      --control-bg: rgb(255 255 255 / 3%);
+      --sidebar-active: rgb(255 255 255 / 6%);
+      --shadow: none;
+      --select-chevron: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 12 12' fill='none'%3E%3Cpath d='M3 4.5L6 7.5L9 4.5' stroke='%23a1a1aa' stroke-width='1.5' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E");
+      --select-plus: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 12 12' fill='none'%3E%3Cpath d='M6 2.5v7M2.5 6h7' stroke='%23a1a1aa' stroke-width='1.5' stroke-linecap='round'/%3E%3C/svg%3E");
+    }
+  }
+  * { box-sizing: border-box; }
+  [hidden] { display: none !important; }
+  html, body { margin: 0; height: 100%; }
+  body {
+    background: var(--background);
+    color: var(--foreground);
+    font: 13px/1.5 var(--font-sans);
+    -webkit-font-smoothing: antialiased;
+    overflow-x: hidden;
+  }
+  button, input, select, textarea { font: inherit; color: inherit; }
+  button { -webkit-tap-highlight-color: transparent; }
+  svg { flex: none; }
+  ::selection { background: color-mix(in oklch, var(--primary) 22%, transparent); }
+  :where(button, input, select, textarea, summary):focus-visible {
+    outline: 2px solid var(--ring);
+    outline-offset: 2px;
+  }
+
+  /* ---------- shell ---------- */
+  .app { display: grid; grid-template-columns: 248px minmax(0, 1fr); height: 100vh; height: 100dvh; }
+  .mobile-bar, .drawer-backdrop { display: none; }
+  aside {
+    background: var(--sidebar);
+    border-right: 1px solid var(--border);
+    display: flex;
+    flex-direction: column;
+    min-height: 0;
+  }
+  aside header {
+    height: 48px;
+    flex: none;
+    display: flex;
+    align-items: center;
+    padding: 0 16px;
+  }
+  aside h1 {
+    margin: 0;
+    font-size: 14px;
+    line-height: 1.2;
+    font-weight: 600;
+    letter-spacing: -.01em;
+  }
+  .nav-body { position: relative; flex: 1; min-height: 0; display: flex; overflow: hidden; }
+  .wf-list {
+    list-style: none;
+    margin: 0;
+    padding: 6px 8px 16px;
+    overflow: auto;
+    flex: 1;
+    position: relative;
+    z-index: 1;
+  }
+  .nav-indicator {
+    position: absolute;
+    left: 8px;
+    top: 0;
+    width: calc(100% - 16px);
+    height: 32px;
+    z-index: 0;
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    background: var(--sidebar-active);
+    box-shadow: var(--shadow);
+    opacity: 0;
+    pointer-events: none;
+    transition: transform 240ms var(--ease-slide), height 240ms var(--ease-slide), opacity 160ms linear;
+  }
+  .nav-indicator.is-visible { opacity: 1; }
+  .sidebar.entering .nav-indicator { opacity: 0; }
+  .sidebar.entering .wf-item[aria-current="true"] {
+    background: var(--sidebar-active);
+    border-color: var(--border);
+    box-shadow: var(--shadow);
+  }
+  .wf-list li { margin: 1px 0; }
+  .wf-list .group {
+    color: var(--muted-foreground);
+    font-size: 11px;
+    font-weight: 500;
+    letter-spacing: .02em;
+    padding: 14px 10px 5px;
+  }
+  .wf-list li.group:first-child { padding-top: 6px; }
+  .wf-item {
+    display: flex;
+    align-items: flex-start;
+    gap: 8px;
+    width: 100%;
+    min-height: 32px;
+    padding: 6px 10px;
+    border: 1px solid transparent;
+    border-radius: 6px;
+    background: none;
+    color: var(--foreground);
+    text-align: left;
+    cursor: pointer;
+    transition: background-color 140ms ease, border-color 140ms ease;
+  }
+  .wf-item:hover { background: var(--accent); }
+  .wf-item[aria-current="true"] {
+    background: transparent;
+    border-color: transparent;
+    box-shadow: none;
+  }
+  .wf-item[aria-current="true"]:hover { background: transparent; }
+  .wf-item .t {
+    flex: 1;
+    min-width: 0;
+    font-size: 12.5px;
+    font-weight: 500;
+    line-height: 1.35;
+  }
+  .wf-item small {
+    display: block;
+    margin-top: 2px;
+    color: var(--muted-foreground);
+    font-size: 11.5px;
+    font-weight: 400;
+    line-height: 1.35;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+  .dot {
+    width: 6px;
+    height: 6px;
+    margin-top: 5px;
+    border-radius: 50%;
+    flex: none;
+    background: var(--success);
+  }
+  .dot.bad { background: var(--error); }
+  .dot.none { background: transparent; border: 1.5px solid var(--faint); }
+  .wf-list .note { padding: 4px 10px; color: var(--muted-foreground); font-size: 11.5px; line-height: 1.5; }
+  .wf-list .note.bad { color: var(--error); }
+  .new-wf { color: var(--muted-foreground); }
+  .new-wf:hover { color: var(--foreground); }
+  .new-wf svg { margin-top: 1px; }
+  .tag {
+    display: inline-flex;
+    align-items: center;
+    height: 18px;
+    margin-left: 8px;
+    padding: 0 6px;
+    border-radius: 4px;
+    background: var(--muted-bg);
+    color: var(--muted-foreground);
+    font-size: 10.5px;
+    font-weight: 500;
+    line-height: 1;
+    white-space: nowrap;
+    vertical-align: 1px;
+  }
+
+  /* ---------- main / sticky top bar ---------- */
+  main { min-width: 0; overflow: auto; background: var(--background); }
+  .topbar {
+    position: sticky;
+    top: 0;
+    z-index: 20;
+    height: 52px;
+    background: color-mix(in srgb, var(--background) 85%, transparent);
+    -webkit-backdrop-filter: blur(12px);
+    backdrop-filter: blur(12px);
+    border-bottom: 1px solid var(--border);
+  }
+  .topbar-inner {
+    height: 100%;
+    max-width: 960px;
+    margin: 0 auto;
+    padding: 0 32px;
+    display: flex;
+    align-items: center;
+    gap: 12px;
+  }
+  .topbar-title { display: flex; align-items: center; gap: 8px; flex: 1; min-width: 0; }
+  .topbar-title h2 {
+    margin: 0;
+    min-width: 0;
+    font-size: 15px;
+    line-height: 1.2;
+    font-weight: 600;
+    letter-spacing: -.01em;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+  .topbar-actions { display: flex; align-items: center; gap: 6px; flex: none; }
+  .topbar-sep { width: 1px; height: 18px; background: var(--border); margin: 0 4px; flex: none; }
+  .save-actions { display: flex; align-items: center; gap: 6px; }
+  .dirty-indicator {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    height: 20px;
+    padding: 0 6px;
+    border-radius: 4px;
+    background: color-mix(in oklch, var(--warning) 12%, transparent);
+    color: var(--warning);
+    font-size: 11px;
+    font-weight: 500;
+    line-height: 1;
+    white-space: nowrap;
+  }
+  .dirty-indicator::before { content: ""; width: 5px; height: 5px; border-radius: 50%; background: currentColor; }
+  .dirty-indicator.pop::before { animation: dot-pop 220ms var(--ease-click) both; }
+  .dirty-indicator.bad { background: color-mix(in oklch, var(--error) 12%, transparent); color: var(--error); }
+  .narrow-label { display: none; }
+
+  /* ---------- page ---------- */
+  .page { max-width: 960px; margin: 0 auto; padding: 16px 32px 96px; }
+  .lead { color: var(--muted-foreground); font-size: 13px; }
+  .page-intro { display: flex; flex-direction: column; gap: 6px; padding: 0; }
+  .intro-line { margin: 0; color: var(--muted-foreground); font-size: 12.5px; line-height: 1.6; }
+  .intro-meta { display: block; margin-left: 0; margin-top: 2px; font-size: 12px; }
+  .intro-path { font-family: var(--mono); font-size: 11.5px; word-break: break-all; }
+  .info-line {
+    display: flex;
+    align-items: flex-start;
+    gap: 6px;
+    margin: 0;
+    color: var(--muted-foreground);
+    font-size: 12.5px;
+    line-height: 1.55;
+  }
+  .info-line svg { margin-top: calc((1.55em - 14px) / 2); }
+  .info-line.warn { color: var(--warning); }
+
+  section.block { margin-top: 28px; }
+  .block-title {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin: 0 0 3px;
+    flex-wrap: wrap;
+  }
+  .block-title h3 {
+    margin: 0;
+    font-size: 14px;
+    line-height: 1.35;
+    font-weight: 600;
+    letter-spacing: -.005em;
+  }
+  .block-title .n {
+    padding: 1px 6px;
+    border-radius: 4px;
+    background: var(--muted-bg);
+    color: var(--muted-foreground);
+    font-size: 11px;
+    line-height: 1.5;
+    font-variant-numeric: tabular-nums;
+  }
+  .block-desc {
+    margin: 0 0 12px;
+    color: var(--muted-foreground);
+    font-size: 12.5px;
+    line-height: 1.55;
+  }
+
+  /* ---------- controls ---------- */
+  .btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 6px;
+    height: 32px;
+    padding: 0 12px;
+    border: 1px solid var(--input);
+    border-radius: 6px;
+    background: var(--control-bg);
+    color: var(--foreground);
+    font-size: 12.5px;
+    font-weight: 500;
+    line-height: 1;
+    white-space: nowrap;
+    cursor: pointer;
+    transition: background-color 140ms ease, border-color 140ms ease, color 140ms ease, transform 120ms var(--ease-click);
+  }
+  .btn:hover:not(:disabled) { background: var(--accent); }
+  .btn:active:not(:disabled) { transform: scale(.97); }
+  .btn.primary { background: var(--primary); border-color: var(--primary); color: var(--primary-foreground); }
+  .btn.primary:hover:not(:disabled) { background: color-mix(in oklch, var(--primary) 88%, #000); }
+  .btn.primary:disabled { background: var(--primary); border-color: var(--primary); color: var(--primary-foreground); opacity: .5; }
+  .btn.primary.is-saved:disabled { background: var(--primary); border-color: var(--primary); color: var(--primary-foreground); opacity: 1; }
+  .btn.ghost { background: transparent; border-color: transparent; color: var(--muted-foreground); }
+  .btn.ghost:hover:not(:disabled) { background: var(--accent); color: var(--foreground); }
+  .btn.danger, .btn.ghost.danger { color: var(--error); }
+  .btn:disabled { opacity: .45; cursor: not-allowed; }
+  .btn.small { height: 28px; padding: 0 10px; border-radius: 6px; font-size: 12px; }
+  .btn.link {
+    height: auto;
+    padding: 1px 3px;
+    border: 0;
+    background: none;
+    color: var(--muted-foreground);
+    font-size: 12px;
+  }
+  .btn.link:hover:not(:disabled) { color: var(--foreground); }
+  .btn.link.danger { color: var(--error); }
+  .btn.link:hover:not(:disabled) { background: var(--accent); }
+  .btn svg { width: 16px; height: 16px; }
+  .icon-btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 22px;
+    height: 22px;
+    padding: 0;
+    border: 0;
+    border-radius: 4px;
+    background: none;
+    color: var(--muted-foreground);
+    line-height: 1;
+    cursor: pointer;
+    transition: background-color 140ms ease, color 140ms ease, transform 120ms var(--ease-click);
+  }
+  .icon-btn:hover { background: var(--accent); color: var(--error); }
+  .icon-btn:active { transform: scale(.92); }
+  .icon-btn svg { width: 16px; height: 16px; }
+
+  input:not([type="checkbox"]):not([type="radio"]),
+  select,
+  textarea {
+    background-color: var(--control-bg);
+    border: 1px solid var(--input);
+    border-radius: 6px;
+    color: var(--foreground);
+  }
+  input:not([type="checkbox"]):not([type="radio"]) { height: 32px; padding: 0 9px; }
+  select {
+    appearance: none;
+    -webkit-appearance: none;
+    height: 32px;
+    padding: 0 30px 0 9px;
+    background-image: var(--select-chevron);
+    background-repeat: no-repeat;
+    background-position: right 10px center;
+    background-size: 12px;
+    cursor: pointer;
+  }
+  textarea { padding: 9px 10px; }
+  input::placeholder, textarea::placeholder { color: color-mix(in oklch, var(--muted-foreground) 72%, transparent); }
+  input[type="checkbox"] {
+    appearance: none;
+    -webkit-appearance: none;
+    width: 14px;
+    height: 14px;
+    margin: 0;
+    flex: none;
+    border: 1px solid var(--input);
+    border-radius: 4px;
+    background-color: var(--control-bg);
+    background-position: center;
+    background-repeat: no-repeat;
+    background-size: 10px;
+    cursor: pointer;
+    transition: background-color 120ms linear, border-color 120ms linear, transform 120ms var(--ease-click);
+  }
+  input[type="checkbox"]:checked {
+    border-color: var(--primary);
+    background-color: var(--primary);
+    background-image: var(--check-mark);
+  }
+  input[type="checkbox"]:active { transform: scale(.92); }
+  input[type="checkbox"]:focus-visible { outline: 2px solid var(--ring); outline-offset: 2px; }
+  input[type="radio"] { accent-color: var(--foreground); width: 14px; height: 14px; margin: 0; }
+  .check { display: inline-flex; align-items: center; gap: 6px; color: var(--muted-foreground); font-size: 11.5px; cursor: pointer; }
+  .check input { width: 14px; height: 14px; }
+
+  .choices { display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: 10px; }
+  .choice {
+    display: flex;
+    align-items: flex-start;
+    gap: 10px;
+    padding: 12px;
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    background: var(--card);
+    cursor: pointer;
+    transition: background-color 140ms ease, border-color 140ms ease;
+  }
+  .choice:hover { background: var(--accent); border-color: var(--input); }
+  .choice:has(input:checked) { border-color: var(--foreground); background: var(--muted-bg); }
+  .choice input { margin-top: 2px; flex: none; }
+  .choice b { display: block; font-size: 13px; font-weight: 500; line-height: 1.35; }
+  .choice small { display: block; margin-top: 2px; color: var(--muted-foreground); font-size: 11.5px; line-height: 1.45; }
+  .notice {
+    margin: 10px 0 0;
+    padding: 9px 11px;
+    border: 1px solid color-mix(in oklch, var(--warning) 30%, transparent);
+    border-radius: 6px;
+    background: color-mix(in oklch, var(--warning) 12%, transparent);
+    color: var(--warning);
+    font-size: 12px;
+    line-height: 1.5;
+  }
+  .notice.bad {
+    border-color: color-mix(in oklch, var(--error) 30%, transparent);
+    background: color-mix(in oklch, var(--error) 12%, transparent);
+    color: var(--error);
+  }
+
+  /* ---------- flow ---------- */
+  .flow-wrap { position: relative; }
+  .flow { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 12px; align-items: start; position: relative; z-index: 1; }
+  .step {
+    position: relative;
+    display: flex;
+    flex-direction: column;
+    gap: 0;
+    min-width: 0;
+    padding: 12px;
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    background: var(--card);
+    transition: background-color 160ms ease, border-color 200ms ease, opacity 200ms ease, transform 180ms var(--ease-slide), box-shadow 180ms ease;
+  }
+  .step > * { position: relative; z-index: 1; }
+  .step::before {
+    content: "";
+    position: absolute;
+    inset: 0;
+    z-index: 0;
+    border-radius: inherit;
+    background: radial-gradient(180px circle at var(--mx, 50%) var(--my, 50%), color-mix(in oklch, var(--primary) 8%, transparent), transparent 72%);
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity 180ms linear;
+  }
+  .step:hover::before { opacity: 1; }
+  .step::after {
+    content: "";
+    position: absolute;
+    inset: -1px;
+    z-index: 2;
+    border: 1px dashed var(--border);
+    border-radius: 10px;
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity 200ms var(--ease-slide);
+  }
+  .step:hover { transform: translateY(-2px); }
+  .step:hover:not(.off) { border-color: color-mix(in oklch, var(--primary) 40%, transparent); }
+  .step.off { opacity: .6; background: transparent; border-color: transparent; }
+  .step.off::after { opacity: 1; }
+  .step.off::before { opacity: 0; }
+  .step.is-signal { border-color: color-mix(in oklch, var(--primary) 40%, transparent); }
+  .step.has-issue { border-color: var(--error); }
+  .step-top { display: flex; align-items: center; gap: 8px; }
+  .step-num {
+    display: grid;
+    place-items: center;
+    width: 18px;
+    height: 18px;
+    flex: none;
+    border-radius: 4px;
+    background: var(--muted-bg);
+    color: var(--muted-foreground);
+    font-size: 11px;
+    font-weight: 600;
+    line-height: 1;
+    font-variant-numeric: tabular-nums;
+  }
+  .step.off .step-num { background: transparent; border: 1px solid var(--border); }
+  .step-name { flex: 1; min-width: 0; font-size: 13px; font-weight: 600; line-height: 1.3; }
+  .step-hint { margin: 6px 0 0; color: var(--muted-foreground); font-size: 11.5px; line-height: 1.5; text-wrap: pretty; word-break: keep-all; line-break: strict; }
+  .step-body { display: flex; flex-direction: column; gap: 0; margin-top: 10px; }
+  .step-body .check { margin-bottom: 12px; }
+  .step-body > .who { display: block; margin-bottom: 6px; }
+  .step-issues:not(:empty) { margin-top: 6px; }
+  .switch { position: relative; display: inline-flex; align-items: center; flex: none; cursor: pointer; }
+  .switch input { position: absolute; width: 28px; height: 16px; margin: 0; opacity: 0; cursor: pointer; }
+  .switch span {
+    position: relative;
+    width: 28px;
+    height: 16px;
+    border-radius: 99px;
+    background: var(--input);
+    transition: background-color 160ms linear;
+  }
+  .switch span::after {
+    content: "";
+    position: absolute;
+    left: 2px;
+    top: 2px;
+    width: 12px;
+    height: 12px;
+    border-radius: 50%;
+    background: #fff;
+    box-shadow: 0 1px 1px rgb(0 0 0 / 15%);
+    transition: transform 220ms var(--ease-click);
+  }
+  .switch input:checked + span { background: var(--primary); }
+  .switch input:checked + span::after { transform: translateX(12px); }
+  .switch input:focus-visible + span { outline: 2px solid var(--ring); outline-offset: 2px; }
+  .who { color: var(--muted-foreground); font-size: 11px; line-height: 1.4; }
+  .people { display: flex; flex-direction: column; gap: 6px; }
+  .person {
+    display: flex;
+    align-items: flex-start;
+    gap: 6px;
+    min-width: 0;
+    padding: 6px 8px;
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    background: var(--muted-bg);
+    font-size: 12.5px;
+  }
+  .person-text { display: flex; flex-direction: column; gap: 1px; min-width: 0; flex: 1; }
+  .person .nm { font-weight: 500; line-height: 1.35; overflow-wrap: anywhere; }
+  .person .md {
+    color: var(--muted-foreground);
+    font-size: 11.5px;
+    line-height: 1.35;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+  .person.missing { border-color: color-mix(in oklch, var(--error) 38%, transparent); background: color-mix(in oklch, var(--error) 10%, transparent); color: var(--error); }
+  .person .icon-btn { margin: 0 -2px 0 0; }
+  .add-select {
+    width: 100%;
+    height: 28px;
+    padding: 0 8px 0 26px;
+    border: 1px dashed var(--border);
+    border-radius: 6px;
+    background-color: transparent;
+    background-image: var(--select-plus);
+    background-repeat: no-repeat;
+    background-position: left 8px center;
+    background-size: 12px;
+    color: var(--muted-foreground);
+    font-size: 11.5px;
+    cursor: pointer;
+    transition: background-color 140ms ease, color 140ms ease;
+  }
+  .add-select:hover { background: var(--accent); color: var(--foreground); }
+  .issue-text, .warn-text {
+    display: flex;
+    align-items: flex-start;
+    gap: 4px;
+    margin: 2px 0 0;
+    font-size: 11.5px;
+    line-height: 1.45;
+  }
+  .issue-text { color: var(--error); }
+  .warn-text { color: var(--warning); }
+  .issue-text svg, .warn-text svg { width: 14px; height: 14px; margin-top: 1px; }
+  .issue-text span, .warn-text span { min-width: 0; }
+
+  /* ---------- roles ---------- */
+  .roles { background: var(--card); border: 1px solid var(--border); border-radius: 10px; overflow: hidden; }
+  .role + .role { border-top: 1px solid var(--border); }
+  .role-row {
+    display: grid;
+    grid-template-columns: minmax(160px, 1.1fr) 2fr minmax(200px, 1.2fr) 24px;
+    align-items: center;
+    gap: 14px;
+    width: 100%;
+    padding: 10px 14px;
+    border: 0;
+    background: none;
+    color: inherit;
+    text-align: left;
+    cursor: pointer;
+    transition: background-color 140ms ease;
+  }
+  .role-row:hover { background: var(--accent); }
+  .role.open .role-row { background: var(--accent); }
+  .role-name b { display: block; font-size: 13px; font-weight: 500; line-height: 1.35; }
+  .role-name small { display: block; margin-top: 1px; color: var(--muted-foreground); font-size: 11.5px; line-height: 1.35; }
+  .role-purpose {
+    display: -webkit-box;
+    min-width: 0;
+    overflow: hidden;
+    color: var(--muted-foreground);
+    font-size: 12px;
+    line-height: 1.45;
+    -webkit-box-orient: vertical;
+    -webkit-line-clamp: 2;
+  }
+  .role-model { min-width: 0; }
+  .role-model .m {
+    display: block;
+    overflow: hidden;
+    color: var(--foreground);
+    font-size: 13px;
+    font-weight: 400;
+    line-height: 1.35;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+  .role-model small {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    margin-top: 1px;
+    overflow: hidden;
+    color: var(--muted-foreground);
+    font-family: var(--mono);
+    font-size: 11.5px;
+    line-height: 1.35;
+    white-space: nowrap;
+  }
+  .role-provider { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .role-fb-badge {
+    flex: none;
+    padding: 0 5px;
+    border-radius: 4px;
+    background: var(--muted-bg);
+    color: var(--muted-foreground);
+    font-family: var(--font-sans);
+    font-size: 11px;
+    font-weight: 500;
+    line-height: 16px;
+    white-space: nowrap;
+  }
+  .chev { display: grid; place-items: center; color: var(--muted-foreground); }
+  .chev svg { width: 16px; height: 16px; transition: transform 220ms var(--ease-click); }
+  .role.open .chev svg { transform: rotate(90deg); }
+  .role.just-opened .chev svg { animation: chevron-turn 220ms var(--ease-click) both; }
+  @keyframes chevron-turn { from { transform: rotate(0); } to { transform: rotate(90deg); } }
+  .badge-bad, .badge-warn {
+    display: inline-flex;
+    align-items: center;
+    height: 16px;
+    margin-left: 6px;
+    padding: 0 6px;
+    border-radius: 99px;
+    font-size: 11px;
+    font-weight: 500;
+    line-height: 1;
+    vertical-align: 1px;
+    white-space: nowrap;
+  }
+  .badge-bad { color: var(--error); background: color-mix(in oklch, var(--error) 14%, transparent); }
+  .badge-warn { color: var(--warning); background: color-mix(in oklch, var(--warning) 14%, transparent); }
+  .role-edit-wrap {
+    display: grid;
+    grid-template-rows: 0fr;
+    overflow: hidden;
+    transition: grid-template-rows 140ms ease-out;
+  }
+  .role-edit-wrap.is-open { grid-template-rows: 1fr; transition-duration: 200ms; }
+  .role-edit-clip { min-height: 0; overflow: hidden; }
+  .role-edit {
+    padding: 2px 14px 16px 16px;
+    border-top: 1px solid var(--border);
+    border-left: 2px solid var(--primary);
+    background: oklch(98.5% 0 0);
+  }
+  .sub-title {
+    margin: 14px 0 7px;
+    color: var(--foreground);
+    font-size: 13px;
+    font-weight: 600;
+    line-height: 1.4;
+    letter-spacing: .04em;
+  }
+  .role-basic { display: grid; grid-template-columns: 1fr 2fr; gap: 12px; }
+  .grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(190px, 1fr)); gap: 12px; }
+  .field { display: flex; flex-direction: column; gap: 4px; min-width: 0; }
+  .field.wide { grid-column: 1 / -1; }
+  .field > span { color: var(--muted-foreground); font-size: 12px; font-weight: 400; line-height: 1.4; }
+  .field input, .field select, .kv input, .kv select, .field textarea { width: 100%; min-width: 0; }
+  .field .invalid, .invalid {
+    border-color: var(--error) !important;
+    background: color-mix(in oklch, var(--error) 12%, var(--control-bg)) !important;
+  }
+  .field .msg { color: var(--error); font-size: 11.5px; }
+  .model-card { padding: 12px; border: 1px solid var(--border); border-radius: 8px; background: var(--card); }
+  .model-card + .model-card { margin-top: 8px; }
+  .model-card .head { display: flex; align-items: center; gap: 8px; margin-bottom: 8px; color: var(--muted-foreground); font-size: 11.5px; }
+  .model-card .head .grow { flex: 1; font-weight: 500; }
+  .model-card.warn { border-color: var(--warning); }
+  .model-grid { display: grid; grid-template-columns: 1fr 1.4fr 140px; gap: 10px; }
+  .model-grid.t3 { grid-template-columns: minmax(0, 1fr) minmax(0, 1.8fr); }
+  .opt-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(170px, 1fr)); gap: 10px; margin-top: 10px; }
+  .card-warn:empty { display: none; }
+  .card-warn { margin-top: 8px; }
+  details.more { margin-top: 14px; }
+  details.more > summary {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    color: var(--muted-foreground);
+    font-size: 12px;
+    list-style: none;
+    cursor: pointer;
+  }
+  details.more > summary::-webkit-details-marker { display: none; }
+  details.more > summary svg { width: 14px; height: 14px; transition: transform 140ms ease; }
+  details.more[open] > summary { margin-bottom: 6px; }
+  details.more[open] > summary svg { transform: rotate(90deg); }
+  .kv { display: grid; grid-template-columns: 1fr 1fr auto; gap: 6px; align-items: center; margin-top: 6px; }
+  .mono { font-family: var(--mono); font-size: 12px; }
+  .role-actions { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 14px; }
+  .sync {
+    display: flex;
+    align-items: flex-start;
+    flex-wrap: wrap;
+    gap: 4px 8px;
+    margin: -2px 0 12px;
+    color: var(--muted-foreground);
+    font-size: 12px;
+    line-height: 1.55;
+  }
+  .sync-text { display: flex; align-items: flex-start; gap: 6px; flex: 1 1 260px; min-width: 0; }
+  .sync-text > span { min-width: 0; overflow-wrap: anywhere; }
+  .sync-text svg { width: 14px; height: 14px; margin-top: calc((1.55em - 14px) / 2); }
+  .sync .btn { flex: none; margin-left: 2px; }
+  .sync.bad { color: var(--warning); }
+  @media (min-width: 761px) {
+    .sync .btn { align-self: flex-start; margin-top: calc((1.55em - 28px) / 2); }
+  }
+
+  /* ---------- rules ---------- */
+  .rules { padding: 0 14px; border: 1px solid var(--border); border-radius: 10px; background: var(--card); }
+  .rule { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; padding: 10px 0; font-size: 12.5px; }
+  .rule + .rule { border-top: 1px solid var(--border); }
+  .rule input { width: 56px; height: 28px; padding: 0 6px; text-align: center; font-variant-numeric: tabular-nums; }
+  .fixed { margin: 10px 0 0; padding-left: 16px; color: var(--muted-foreground); font-size: 11.5px; line-height: 1.6; }
+  .fixed li { margin: 1px 0; }
+
+  /* ---------- advanced ---------- */
+  .advanced { margin-top: 28px; }
+  .advanced > summary {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 2px 0;
+    color: var(--foreground);
+    font-size: 14px;
+    font-weight: 600;
+    line-height: 1.35;
+    list-style: none;
+    cursor: pointer;
+  }
+  .advanced > summary::-webkit-details-marker { display: none; }
+  .advanced > summary svg { width: 16px; height: 16px; color: var(--muted-foreground); transition: transform 140ms ease; }
+  .advanced[open] > summary svg { transform: rotate(90deg); }
+  .advanced .inner { display: flex; flex-direction: column; gap: 14px; margin-top: 12px; }
+  .path { font-family: var(--mono); font-size: 11.5px; color: var(--muted-foreground); word-break: break-all; }
+  textarea.json {
+    min-height: 420px;
+    padding: 10px 12px;
+    border-radius: 8px;
+    background: var(--card);
+    font-family: var(--mono);
+    font-size: 12px;
+    line-height: 1.55;
+    resize: vertical;
+    tab-size: 2;
+  }
+
+  .empty-state { margin-top: 20px; padding: 24px; border: 1px solid var(--border); border-radius: 10px; background: var(--card); }
+  .empty-state p { margin: 0 0 10px; font-size: 12.5px; }
+
+  /* ---------- save status strip ---------- */
+  .savebar {
+    position: sticky;
+    bottom: 0;
+    z-index: 15;
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    max-height: 132px;
+    overflow: auto;
+    padding: 8px 32px;
+    border-top: 1px solid var(--border);
+    background: color-mix(in srgb, var(--card) 92%, transparent);
+    -webkit-backdrop-filter: blur(12px);
+    backdrop-filter: blur(12px);
+    font-size: 12px;
+    opacity: 0;
+    transform: translateY(100%);
+    transition: transform var(--dur-exit) var(--ease-exit), opacity 140ms linear;
+  }
+  .savebar.is-open {
+    opacity: 1;
+    transform: none;
+    transition: transform var(--dur-panel) var(--ease-slide), opacity 180ms linear;
+  }
+  .savebar .msg { display: flex; flex-direction: column; gap: 2px; line-height: 1.45; }
+  .savebar .msg.bad { color: var(--error); }
+  .savebar .msg.dirty { color: var(--warning); }
+  .savebar .msg.ok { color: var(--muted-foreground); }
+  .problems { margin: 2px 0 0; padding-left: 16px; font-size: 11.5px; }
+  .problems li { margin: 1px 0; }
+  .problems button {
+    padding: 0;
+    border: 0;
+    background: none;
+    color: var(--error);
+    font-size: inherit;
+    text-align: left;
+    text-decoration: underline dotted;
+    text-underline-offset: 2px;
+    cursor: pointer;
+  }
+  .problems.warn button { color: var(--warning); }
+
+  /* ---------- dialog / toast ---------- */
+  dialog {
+    width: min(440px, calc(100vw - 32px));
+    padding: 20px;
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    background: var(--card);
+    color: var(--foreground);
+    box-shadow: 0 12px 32px rgb(0 0 0 / 12%);
+    opacity: 0;
+    transform: scale(.96);
+    transition: opacity 140ms var(--ease-exit), transform 140ms var(--ease-exit), display 140ms allow-discrete, overlay 140ms allow-discrete;
+  }
+  dialog[open] {
+    opacity: 1;
+    transform: none;
+    transition: opacity 220ms var(--ease-slide), transform 220ms var(--ease-slide), display 220ms allow-discrete, overlay 220ms allow-discrete;
+  }
+  @starting-style {
+    dialog[open] { opacity: 0; transform: scale(.96); }
+  }
+  dialog::backdrop {
+    background: rgb(0 0 0 / 0%);
+    -webkit-backdrop-filter: blur(2px);
+    backdrop-filter: blur(2px);
+    transition: background-color 140ms var(--ease-exit);
+  }
+  dialog[open]::backdrop { background: rgb(0 0 0 / 40%); transition-duration: 220ms; }
+  @starting-style {
+    dialog[open]::backdrop { background: rgb(0 0 0 / 0%); }
+  }
+  dialog form { display: flex; flex-direction: column; gap: 12px; }
+  dialog h3 { font-size: 15px; font-weight: 600; line-height: 1.35; }
+
+  .toast {
+    position: fixed;
+    right: 16px;
+    bottom: 16px;
+    z-index: 100;
+    max-width: min(380px, calc(100vw - 32px));
+    padding: 9px 12px;
+    border-radius: 8px;
+    background: var(--foreground);
+    color: var(--background);
+    font-size: 12.5px;
+    line-height: 1.45;
+    box-shadow: 0 4px 16px rgb(0 0 0 / 12%);
+    opacity: 0;
+    transform: translate3d(14px, 8px, 0);
+    transition: opacity 140ms var(--ease-exit), transform 140ms var(--ease-exit);
+    pointer-events: none;
+  }
+  .toast.show {
+    opacity: 1;
+    transform: none;
+    transition: opacity 200ms linear, transform 220ms var(--ease-slide);
+  }
+  .toast.bad { background: var(--error); color: #fff; }
+
+  .flash { animation: flash-ring 600ms var(--ease-slide); }
+  @keyframes flash-ring {
+    0% { box-shadow: 0 0 0 0 color-mix(in oklch, var(--primary) 30%, transparent); }
+    40% { box-shadow: 0 0 0 6px color-mix(in oklch, var(--primary) 30%, transparent); }
+    100% { box-shadow: 0 0 0 0 color-mix(in oklch, var(--primary) 0%, transparent); }
+  }
+
+  @media (prefers-color-scheme: dark) {
+    dialog, .toast { box-shadow: none; }
+    .step:hover:not(.off) {
+      box-shadow: 0 0 0 1px color-mix(in oklch, var(--primary) 24%, transparent),
+        0 8px 24px color-mix(in oklch, var(--primary) 12%, transparent);
+    }
+    .role-edit { background: #0a0a0a; }
+    .save-actions #save:disabled:not(.is-saved) { color: rgb(255 255 255 / 90%); opacity: .45; }
+    .block-title .n { background: rgb(255 255 255 / 8%); }
+    .nav-indicator { border: 0; box-shadow: none; background: rgb(255 255 255 / 6%); }
+    .sidebar.entering .wf-item[aria-current="true"] { border-color: transparent; box-shadow: none; background: rgb(255 255 255 / 6%); }
+  }
+
+  /* ---------- motion ---------- */
+  @keyframes row-in { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: none; } }
+  .list-enter > li { animation: row-in 260ms var(--ease-slide) both; animation-delay: calc(var(--row-i, 0) * 30ms); }
+
+  @keyframes enter-top { from { opacity: 0; transform: translateY(-4px); } to { opacity: 1; transform: none; } }
+  @keyframes enter-up { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: none; } }
+  .view-enter .topbar { animation: enter-top 180ms var(--ease-slide) both; }
+  .view-enter .page-intro { animation: enter-up 260ms var(--ease-slide) 50ms both; }
+  .view-enter .page > section.block { animation: enter-up 280ms var(--ease-slide) 100ms both; }
+  .view-enter .page > section.block:nth-of-type(2) { animation-delay: 150ms; }
+  .view-enter .page > section.block:nth-of-type(3) { animation-delay: 200ms; }
+  .view-enter .page > section.block:nth-of-type(4) { animation-delay: 250ms; }
+  .view-enter .page > details.advanced { animation: enter-up 280ms var(--ease-slide) 250ms both; }
+
+  /* page transitions: sidebar stays live so its indicator can slide */
+  .page { view-transition-name: page; }
+  aside { view-transition-name: sidebar; }
+  .topbar { view-transition-name: topbar; }
+  ::view-transition-old(root), ::view-transition-new(root), ::view-transition-group(page), ::view-transition-group(topbar), ::view-transition-group(sidebar) { animation: none; }
+  ::view-transition-old(sidebar), ::view-transition-new(sidebar) { animation: none; opacity: 0; }
+  ::view-transition-old(page) { animation: page-out 120ms var(--ease-exit) both; }
+  ::view-transition-new(page) { animation: page-in 220ms var(--ease-slide) both; }
+  ::view-transition-old(topbar) { animation: top-out 120ms var(--ease-exit) both; }
+  ::view-transition-new(topbar) { animation: top-in 180ms var(--ease-slide) both; }
+  @keyframes page-out { to { opacity: 0; transform: translateY(-4px); } }
+  @keyframes page-in { from { opacity: 0; transform: translateY(4px); } }
+  @keyframes top-out { to { opacity: 0; } }
+  @keyframes top-in { from { opacity: 0; } }
+
+  /* signal line behind the flow cards */
+  .flow-line { position: absolute; inset: 0; z-index: 0; pointer-events: none; }
+  .flow-seg {
+    position: absolute;
+    height: 1px;
+    background: var(--border);
+    opacity: 1;
+    transform: translateY(-50%);
+    transition: opacity 200ms var(--ease-slide), background-color 200ms linear;
+  }
+  .flow-seg.off { opacity: .35; }
+  .flow-spark {
+    position: absolute;
+    left: 0;
+    top: 0;
+    z-index: 0;
+    width: 80px;
+    height: 2px;
+    border-radius: 99px;
+    background: linear-gradient(90deg, transparent, color-mix(in oklch, var(--primary) 90%, transparent), transparent);
+    opacity: 0;
+    pointer-events: none;
+    will-change: transform, opacity;
+  }
+  .step-num { transition: background-color 160ms linear, color 160ms linear, transform 180ms var(--ease-click); }
+  .step-num.is-lit { background: var(--primary); color: var(--primary-foreground); transform: scale(1.08); }
+  .step.is-turning-on { animation: step-in 200ms var(--ease-slide); }
+  .step.is-turning-off { animation: step-out 200ms var(--ease-exit); }
+  .step.is-turning-on::after { animation: dashed-out 200ms var(--ease-slide) both; }
+  .step.is-turning-off::after { animation: dashed-in 200ms var(--ease-slide) both; }
+  @keyframes step-in { from { opacity: .6; } to { opacity: 1; } }
+  @keyframes step-out { from { opacity: 1; } to { opacity: .6; } }
+  @keyframes dashed-in { from { opacity: 0; } to { opacity: 1; } }
+  @keyframes dashed-out { from { opacity: 1; } to { opacity: 0; } }
+
+  /* chip enter / leave */
+  .person.is-new { animation: chip-in 240ms var(--ease-click) both; transform-origin: left center; }
+  @keyframes chip-in { from { opacity: 0; transform: scale(.9); } to { opacity: 1; transform: none; } }
+  .chip-ghost {
+    position: fixed;
+    z-index: 60;
+    margin: 0 !important;
+    pointer-events: none;
+    transform-origin: right center;
+    animation: chip-out 120ms var(--ease-exit) both;
+  }
+  @keyframes chip-out { to { opacity: 0; transform: scale(.86); } }
+
+  /* saved check / failed shake / loading */
+  .save-actions #save { height: 28px; min-width: 96px; padding: 0 12px; font-size: 12.5px; font-weight: 500; }
+  .save-dot { width: 6px; height: 6px; border-radius: 50%; background: currentColor; flex: none; }
+  .saved-check path { stroke-dasharray: 20; stroke-dashoffset: 20; animation: check-draw 320ms var(--ease-slide) 80ms forwards; }
+  @keyframes check-draw { to { stroke-dashoffset: 0; } }
+  .btn.is-shaking { animation: save-shake 360ms var(--ease-exit); }
+  @keyframes save-shake {
+    0%, 100% { transform: translateX(0); }
+    20% { transform: translateX(-4px); }
+    40% { transform: translateX(4px); }
+    60% { transform: translateX(-4px); }
+    80% { transform: translateX(4px); }
+  }
+  .btn.is-loading svg { animation: spin 900ms linear infinite; }
+  @keyframes spin { to { transform: rotate(360deg); } }
+  #sec-roles.is-syncing .model-card { position: relative; overflow: hidden; }
+  #sec-roles.is-syncing .model-card::after {
+    content: "";
+    position: absolute;
+    inset: 0;
+    z-index: 2;
+    pointer-events: none;
+    background: linear-gradient(100deg, transparent 20%, color-mix(in oklch, var(--foreground) 7%, transparent) 50%, transparent 80%);
+    transform: translateX(-100%);
+    animation: shimmer 1.2s linear infinite;
+  }
+  @keyframes shimmer { to { transform: translateX(100%); } }
+  @keyframes dot-pop { from { transform: scale(0); opacity: .4; } to { transform: scale(1); opacity: 1; } }
+  @media (hover: none) { .step::before { display: none; } }
+
+  /* ---------- responsive ---------- */
+  @media (max-width: 1100px) {
+    .flow { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+    .flow-line, .flow-spark { display: none; }
+  }
+  @media (max-width: 760px) {
+    .app { grid-template-columns: 1fr; grid-template-rows: auto minmax(0, 1fr); height: auto; min-height: 100vh; }
+    .mobile-bar {
+      display: flex;
+      position: sticky;
+      top: 0;
+      z-index: 46;
+      height: 48px;
+      flex: none;
+      align-items: center;
+      gap: 10px;
+      padding: 0 12px 0 16px;
+      border-bottom: 1px solid var(--border);
+      background: color-mix(in srgb, var(--sidebar) 94%, transparent);
+      -webkit-backdrop-filter: blur(12px);
+      backdrop-filter: blur(12px);
+    }
+    .mobile-brand { display: flex; align-items: baseline; gap: 8px; flex: 1; min-width: 0; }
+    .mobile-brand-title { font-size: 12.5px; font-weight: 600; white-space: nowrap; }
+    .mobile-nav-btn {
+      display: grid;
+      place-items: center;
+      width: 32px;
+      height: 32px;
+      flex: none;
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      background: var(--card);
+      color: var(--foreground);
+      cursor: pointer;
+    }
+    .mobile-nav-btn:hover { background: var(--accent); }
+    .drawer-backdrop {
+      display: block;
+      position: fixed;
+      inset: 0;
+      z-index: 45;
+      background: rgb(0 0 0 / 40%);
+      -webkit-backdrop-filter: blur(2px);
+      backdrop-filter: blur(2px);
+      opacity: 0;
+      pointer-events: none;
+      transition: opacity 200ms linear;
+    }
+    body.nav-open .drawer-backdrop { opacity: 1; pointer-events: auto; }
+    body.nav-open { overflow: hidden; }
+    aside {
+      position: fixed;
+      top: 0;
+      bottom: 0;
+      left: 0;
+      z-index: 50;
+      width: min(280px, 84vw);
+      height: 100dvh;
+      max-height: none;
+      border-right: 1px solid var(--border);
+      border-bottom: 0;
+      transform: translateX(-100%);
+      transition: transform 300ms var(--ease-slide);
+    }
+    body.nav-open aside { transform: none; }
+    aside header { height: 48px; flex: none; }
+    .wf-list { max-height: none; }
+    main { overflow: visible; }
+    .topbar { top: 48px; }
+    .topbar-inner { gap: 8px; padding: 0 16px; }
+    .topbar-actions { gap: 4px; }
+    .topbar-title h2 { font-size: 14px; }
+    .topbar .wide-label { display: none; }
+    .topbar .narrow-label { display: inline; }
+    .topbar-sep { margin: 0 1px; }
+    .page { padding: 16px 16px 80px; }
+    .flow { grid-template-columns: 1fr; }
+    .role-row {
+      grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) 18px;
+      gap: 2px 12px;
+      align-items: start;
+      padding: 10px 12px;
+    }
+    .role-name { grid-column: 1 / 3; }
+    .role-purpose { grid-column: 1; -webkit-line-clamp: 1; }
+    .role-model { grid-column: 2; text-align: right; }
+    .role-model .m, .role-model small { text-align: right; }
+    .role-model small { justify-content: flex-end; white-space: nowrap; overflow: hidden; text-overflow: clip; }
+    .role-basic { grid-template-columns: 1fr; }
+    .chev { grid-row: 1 / 3; grid-column: 3; align-self: center; }
+    .model-grid, .model-grid.t3 { grid-template-columns: 1fr; }
+    .sync { align-items: flex-start; }
+    .sync-text { flex-basis: 100%; }
+    .sync .btn { margin-left: auto; }
+    .info-line svg { align-self: flex-start; margin-top: calc((1.55em - 14px) / 2); }
+    .savebar { padding: 8px 16px; }
+    .page-intro { padding-bottom: 0; }
+    .intro-meta { display: block; margin-left: 0; }
+  }
+  @media (max-width: 420px) {
+    .topbar-inner { padding: 0 12px; }
+    .topbar-title { gap: 6px; }
+    .topbar-title h2 { font-size: 13.5px; }
+    .topbar .btn.small { padding: 0 8px; }
+    .page { padding: 14px 12px 80px; }
+    .role-row { padding: 10px; }
+  }
+  @media (prefers-reduced-motion: reduce) {
+    *, *::before, *::after {
+      animation-duration: .01ms !important;
+      animation-iteration-count: 1 !important;
+      transition-duration: .01ms !important;
+      scroll-behavior: auto !important;
+    }
+    .step::before { display: none; }
+  }
+
+</style>
+</head>
+<body>
+<div class="app">
+  <div class="mobile-bar">
+    <div class="mobile-brand"><span class="mobile-brand-title">Chief 工作流</span></div>
+    <button class="mobile-nav-btn" id="mobile-nav-toggle" type="button" aria-label="打开工作流列表" aria-expanded="false">
+      <svg width="16" height="16" viewBox="0 0 16 16" fill="none" aria-hidden="true"><path d="M5.5 4h8M5.5 8h8M5.5 12h8" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/><circle cx="2.8" cy="4" r=".9" fill="currentColor"/><circle cx="2.8" cy="8" r=".9" fill="currentColor"/><circle cx="2.8" cy="12" r=".9" fill="currentColor"/></svg>
+    </button>
+  </div>
+  <aside class="sidebar">
+    <header class="brand"><h1>Chief 工作流</h1></header>
+    <div class="nav-body">
+      <ul class="wf-list" id="list"></ul>
+      <span class="nav-indicator" id="nav-indicator" aria-hidden="true"></span>
+    </div>
+  </aside>
+  <main id="main"><div class="page"><p class="lead">加载中…</p></div></main>
+</div>
+<div class="drawer-backdrop" id="drawer-backdrop" aria-hidden="true"></div>
+<datalist id="dl-provider"></datalist>
+<datalist id="dl-model"></datalist>
+<dialog id="dlg-new" aria-labelledby="dlg-new-title"><form method="dialog" id="form-new">
+  <h3 id="dlg-new-title" style="margin:0">新建工作流</h3>
+  <p class="block-desc" style="margin:0">先复制一个现有工作流，再按需修改。建好后在左边点项目，就可以让它用这个工作流。</p>
+  <label class="field"><span>显示名称</span><input name="title" required placeholder="例如：快速修复"></label>
+  <label class="field"><span>内部名称（小写字母、数字、连字符，也是文件名）</span><input name="name" class="mono" required pattern="[a-z0-9][a-z0-9\-]*" placeholder="例如：quick-fix"></label>
+  <label class="field"><span>复制自</span><select name="from"></select></label>
+  <div style="display:flex;gap:8px;justify-content:flex-end"><button class="btn" value="cancel" formnovalidate>取消</button><button class="btn primary" value="ok">创建</button></div>
+</form></dialog>
+<div class="toast" id="toast" role="status" aria-live="polite"></div>
+
+<script type="module">
+import { issues as findIssues } from "/validate-workflow.mjs";
+
+// ---------- vocabulary ----------
+const STEPS = [
+  { id: "recon", name: "摸底", hint: "需求或影响面不清楚时，先派人只读地看一遍" },
+  { id: "design", name: "架构设计", hint: "大型改动先出方案再动手" },
+  { id: "implement", name: "实现", hint: "真正改代码；按改动大小挑角色", always: true },
+  { id: "review", name: "审查", hint: "换一个模型独立检查，给出通过 / 打回" },
+];
+const TASK_TYPES = { implementation: "实现", research: "调研", review: "审查", design: "设计", test: "测试", general: "通用" };
+const EFFORT_KEYS = { reasoningEffort: "推理强度", thinking: "思考强度" };
+const EFFORT_LEVELS = { low: "低", medium: "中", high: "高", xhigh: "极高" };
+// Chinese names for T3 option descriptors / values; unknown ones fall back to T3's own label.
+const OPT_NAMES = { reasoningEffort: "推理强度", effort: "推理强度", thinking: "思考强度", thinking_level: "思考强度", serviceTier: "服务档位", fastMode: "快速模式" };
+const CHOICE_NAMES = { off: "关闭", minimal: "最低", low: "低", medium: "中", high: "高", xhigh: "极高", max: "最高", auto: "自动", default: "默认", priority: "优先" };
+const RULES = [
+  { key: "maxParallelWriters", before: "最多", after: "个 Worker 同时写代码", min: 1, max: 8 },
+  { key: "maxReworkRounds", before: "同一个问题返工", after: "轮还不通过，就停下来问我", min: 0, max: 5 },
+  { key: "contractFileThreshold", before: "改动超过", after: "个文件时，先写任务契约再派单", min: 0, max: 99 },
+];
+
+const state = { t3: null, warns: [], st: null, sel: "", project: null, cur: null, data: null, saved: "", openRole: null, jsonDraft: null, issues: [] };
+const reduceMotion = () => matchMedia("(prefers-reduced-motion: reduce)").matches;
+let booted = false;
+let pageEntered = false;
+let navHasPosition = false;
+let savebarHideTimer = 0;
+let savedUntil = 0;
+let savedResetTimer = 0;
+let dirtyWas = false;
+let justAddedChip = null;
+let justOpenedRole = null;
+let roleOpenToken = 0;
+let flowToggle = null;
+let signalPlayed = false;
+let flowSparkTimer = 0;
+let flowResizeTimer = 0;
+const $ = (s, r = document) => r.querySelector(s);
+const $$ = (s, r = document) => [...r.querySelectorAll(s)];
+const icon = (body) => `<svg width="16" height="16" viewBox="0 0 16 16" fill="none" aria-hidden="true">${body}</svg>`;
+const I = {
+  plus: icon(`<path d="M8 3.25v9.5M3.25 8h9.5" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/>`),
+  x: icon(`<path d="M4 4l8 8M12 4l-8 8" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/>`),
+  chevron: icon(`<path d="M6 3.5L10.5 8 6 12.5" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>`),
+  info: icon(`<circle cx="8" cy="8" r="6.25" stroke="currentColor" stroke-width="1.5"/><path d="M8 7.4v3.35" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/><circle cx="8" cy="5.15" r=".9" fill="currentColor"/>`),
+  alert: icon(`<path d="M8 2.9l5.9 10.2H2.1L8 2.9z" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"/><path d="M8 6.35v3.1" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/><circle cx="8" cy="11.4" r=".85" fill="currentColor"/>`),
+  copy: icon(`<rect x="5.25" y="5.25" width="7.25" height="7.25" rx="1.4" stroke="currentColor" stroke-width="1.5"/><path d="M10.5 5.25V4.5A1.5 1.5 0 0 0 9 3H4.75A1.75 1.75 0 0 0 3 4.75V9a1.5 1.5 0 0 0 1.5 1.5h.75" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/>`),
+  trash: icon(`<path d="M3.25 4.5h9.5M6.25 4.5v-1c0-.414.336-.75.75-.75h2c.414 0 .75.336.75.75v1M4.9 4.5l.5 7.2c.03.43.386.8.818.8h3.564c.432 0 .788-.37.818-.8l.5-7.2" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>`),
+  pencil: icon(`<path d="M10.4 2.9l2.7 2.7M3 13l.6-3.1 6.8-6.8a1.15 1.15 0 0 1 1.63 0l.87.87a1.15 1.15 0 0 1 0 1.63l-6.8 6.8L3 13z" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>`),
+  refresh: icon(`<path d="M13.1 6.1A5.35 5.35 0 1 0 13.3 10" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/><path d="M13.1 2.9v3.2H9.9" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>`),
+  check: `<svg class="saved-check" width="16" height="16" viewBox="0 0 16 16" fill="none" aria-hidden="true"><path pathLength="20" d="M3.2 8.4l3.05 3.05L12.9 4.6" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg>`,
+};
+const esc = (v) => String(v ?? "").replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
+const dirty = () => state.data !== null && JSON.stringify(state.data) !== state.saved;
+function changedFields() {
+  if (!dirty() || !state.saved) return 0;
+  let saved;
+  try { saved = JSON.parse(state.saved); } catch { return 0; }
+  if (!saved || typeof saved !== "object" || typeof state.data !== "object") return 0;
+  let n = 0;
+  for (const k of new Set([...Object.keys(saved), ...Object.keys(state.data)])) {
+    if (JSON.stringify(saved[k]) !== JSON.stringify(state.data[k])) n++;
+  }
+  return n;
+}
+const P = (p) => esc(JSON.stringify(p));
+const samePath = (a, b) => JSON.stringify(a) === JSON.stringify(b);
+const startsWith = (p, prefix) => prefix.every((v, i) => p[i] === v);
+const scrollMode = () => (reduceMotion() ? "auto" : "smooth");
+
+function positionNavIndicator(animate = true) {
+  const ind = $("#nav-indicator"), list = $("#list");
+  if (!ind || !list) return;
+  const btn = list.querySelector('[aria-current="true"]');
+  if (!btn) { ind.classList.remove("is-visible"); navHasPosition = false; return; }
+  const nav = ind.parentElement, nr = nav.getBoundingClientRect(), br = btn.getBoundingClientRect();
+  const direct = !animate || !navHasPosition;
+  if (direct) ind.style.transition = "none";
+  ind.style.transform = `translateY(${br.top - nr.top}px)`;
+  ind.style.height = `${br.height}px`;
+  ind.style.left = `${br.left - nr.left}px`;
+  ind.style.width = `${br.width}px`;
+  if (direct) { void ind.offsetWidth; ind.style.transition = ""; }
+  ind.classList.add("is-visible");
+  navHasPosition = true;
+}
+
+function closeNav() {
+  document.body.classList.remove("nav-open");
+  $("#mobile-nav-toggle")?.setAttribute("aria-expanded", "false");
+}
+function toggleNav() {
+  const open = !document.body.classList.contains("nav-open");
+  document.body.classList.toggle("nav-open", open);
+  $("#mobile-nav-toggle")?.setAttribute("aria-expanded", String(open));
+}
+
+function playEntry() {
+  if (pageEntered) return;
+  pageEntered = true;
+  if (reduceMotion()) return;
+  const main = $("#main"), list = $("#list"), aside = $("aside");
+  if (!main || !list) return;
+  main.classList.add("view-enter");
+  list.classList.add("list-enter");
+  aside?.classList.add("entering");
+  setTimeout(() => {
+    main.classList.remove("view-enter");
+    list.classList.remove("list-enter");
+    aside?.classList.remove("entering");
+  }, 900);
+}
+
+async function runViewTransition(update) {
+  if (!booted || reduceMotion() || typeof document.startViewTransition !== "function") { update(); return; }
+  const vt = document.startViewTransition(update);
+  try { await vt.finished; } catch {}
+}
+
+const flowLineEnabled = () => matchMedia("(min-width: 1101px)").matches;
+
+function layoutFlowSignal() {
+  const wrap = $(".flow-wrap");
+  if (!wrap) return null;
+  const cards = $$(".step", wrap);
+  if (!cards.length) return null;
+  const wr = wrap.getBoundingClientRect();
+  const centers = cards.map((card) => {
+    const r = card.getBoundingClientRect();
+    const nr = card.querySelector(".step-num")?.getBoundingClientRect();
+    return { id: card.dataset.step, x: r.left - wr.left + r.width / 2, y: nr ? nr.top - wr.top + nr.height / 2 : r.top - wr.top + 20, enabled: !card.classList.contains("off") };
+  });
+  const line = wrap.querySelector(".flow-line");
+  if (line) {
+    line.replaceChildren();
+    const offSegs = [];
+    for (let i = 0; i < centers.length - 1; i++) {
+      const seg = document.createElement("span");
+      seg.className = "flow-seg";
+      seg.style.left = `${centers[i].x}px`;
+      seg.style.width = `${centers[i + 1].x - centers[i].x}px`;
+      seg.style.top = `${centers[i].y}px`;
+      if (!centers[i].enabled || !centers[i + 1].enabled) offSegs.push(seg);
+      line.appendChild(seg);
+    }
+    if (offSegs.length) requestAnimationFrame(() => offSegs.forEach((seg) => seg.classList.add("off")));
+  }
+  const spark = wrap.querySelector(".flow-spark");
+  if (spark) spark.style.top = `${centers[0].y - 1}px`;
+  return { wrap, cards, centers };
+}
+
+function pulseFlowBadge(id) {
+  const card = $(`.step[data-step="${CSS.escape(id)}"]`);
+  const num = card?.querySelector(".step-num");
+  if (!num || card.classList.contains("off")) return;
+  num.classList.add("is-lit");
+  card.classList.add("is-signal");
+  setTimeout(() => num.classList.remove("is-lit"), 240);
+  setTimeout(() => card.classList.remove("is-signal"), 140);
+}
+
+function runFlowSpark(fromId, toId, duration) {
+  if (reduceMotion() || !flowLineEnabled()) return;
+  const data = layoutFlowSignal();
+  if (!data) return;
+  const from = data.centers.find((c) => c.id === fromId);
+  const to = data.centers.find((c) => c.id === toId);
+  const spark = data.wrap.querySelector(".flow-spark");
+  if (!from || !to || !spark) return;
+  clearTimeout(flowSparkTimer);
+  spark.style.transition = "none";
+  spark.style.opacity = "0";
+  spark.style.transform = `translateX(${from.x - 40}px)`;
+  void spark.offsetWidth;
+  spark.style.transition = `transform ${duration}ms var(--ease-slide), opacity 100ms linear`;
+  spark.style.opacity = "1";
+  spark.style.transform = `translateX(${to.x - 40}px)`;
+  flowSparkTimer = setTimeout(() => { spark.style.opacity = "0"; }, duration + 80);
+}
+
+function signalInitialFlow() {
+  const data = layoutFlowSignal();
+  if (!data || reduceMotion() || !flowLineEnabled()) return;
+  const enabled = data.centers.filter((c) => c.enabled);
+  if (!enabled.length) return;
+  if (enabled.length === 1) { pulseFlowBadge(enabled[0].id); return; }
+  const from = enabled[0], to = enabled[enabled.length - 1];
+  const distance = Math.abs(to.x - from.x);
+  const duration = Math.min(900, Math.max(420, distance * 0.95));
+  runFlowSpark(from.id, to.id, duration);
+  for (const c of enabled) {
+    const at = distance ? Math.abs(c.x - from.x) / distance : 0;
+    setTimeout(() => pulseFlowBadge(c.id), Math.max(0, at * duration - 80));
+  }
+}
+
+function signalFlowOn(id) {
+  requestAnimationFrame(() => {
+    const data = layoutFlowSignal();
+    if (!data) return;
+    const enabled = data.centers.filter((c) => c.enabled);
+    const i = enabled.findIndex((c) => c.id === id);
+    if (i < 0) return;
+    if (i === 0) { pulseFlowBadge(id); return; }
+    const from = enabled[i - 1], to = enabled[i];
+    const distance = Math.abs(to.x - from.x);
+    const duration = Math.min(520, Math.max(240, distance * 0.9));
+    if (flowLineEnabled()) runFlowSpark(from.id, to.id, duration);
+    setTimeout(() => pulseFlowBadge(id), flowLineEnabled() ? Math.max(0, duration - 50) : 0);
+  });
+}
+
+function shakeSave() {
+  const btn = $("#save");
+  if (!btn) return;
+  btn.classList.remove("is-shaking");
+  void btn.offsetWidth;
+  btn.classList.add("is-shaking");
+  setTimeout(() => btn.classList.remove("is-shaking"), 400);
+}
+
+let toastTimer;
+function toast(msg, bad = false) {
+  const t = $("#toast");
+  t.textContent = msg; t.className = `toast show${bad ? " bad" : ""}`;
+  clearTimeout(toastTimer); toastTimer = setTimeout(() => (t.className = "toast"), bad ? 6000 : 2500);
+}
+async function api(method, url, body) {
+  let res;
+  try {
+    res = await fetch(url, { method, headers: body ? { "content-type": "application/json" } : {}, body: body ? JSON.stringify(body) : undefined });
+  } catch {
+    // Server gone (app quit, or the page was opened as a file): say so instead of "Failed to fetch".
+    throw new Error(location.protocol === "file:" ? "请通过 Chief 工作流应用或 node panel/server.mjs 打开面板，不能直接双击 index.html" : "连不上面板服务（可能已经关闭）。重新打开「Chief 工作流」应用后再点保存，页面上的修改不要刷新");
+  }
+  const json = await res.json().catch(() => ({ error: `HTTP ${res.status}` }));
+  if (!res.ok) { const e = new Error(json.error || `HTTP ${res.status}`); e.payload = json; e.status = res.status; throw e; }
+  return json;
+}
+
+// ---------- helpers on data ----------
+const roleName = (k) => state.data.roles?.[k]?.label || k;
+function effortOf(t) {
+  for (const key of Object.keys(EFFORT_KEYS)) if (t?.options && key in t.options) return { key, value: t.options[key] };
+  return null;
+}
+// ---------- T3 providers ----------
+const t3On = () => !!(state.t3?.ok && state.t3.providers.length);
+const provOf = (id) => state.t3?.providers?.find((p) => p.id === id);
+const modelOf = (t) => provOf(t?.provider)?.models.find((m) => m.slug === t?.model);
+const usable = (p) => p.enabled && p.installed && p.status === "ready";
+const optName = (d) => OPT_NAMES[d.id] || d.label;
+const choiceName = (c) => CHOICE_NAMES[c.id] ? `${CHOICE_NAMES[c.id]}（${c.id}）` : c.label === c.id ? c.id : `${c.label}（${c.id}）`;
+async function loadProviders() {
+  try { state.t3 = await api("GET", "/api/providers"); } catch (e) { state.t3 = { ok: false, error: e.message, providers: [] }; }
+}
+function modelSummary(t) {
+  if (!t?.model) return "未设置模型";
+  const m = modelOf(t);
+  let level = null;
+  for (const [k, v] of Object.entries(t.options || {})) {
+    const d = m?.options.find((o) => o.id === k);
+    if (d?.type === "select") { level = CHOICE_NAMES[v] || d.choices.find((c) => c.id === v)?.label || v; break; }
+    if (!m && k in EFFORT_KEYS) { level = EFFORT_LEVELS[v] || v; break; }
+  }
+  return `${m?.name || t.model}${level ? ` · ${level}` : ""}`;
+}
+// Mismatches with T3's provider snapshot. Warnings only: the snapshot can lag behind T3.
+function t3Warnings(data) {
+  if (!t3On() || !data || typeof data.roles !== "object" || !data.roles) return [];
+  const out = [];
+  for (const [k, r] of Object.entries(data.roles)) {
+    if (!r || typeof r !== "object") continue;
+    const targets = [[["roles", k, "target"], r.target], ...(Array.isArray(r.fallbacks) ? r.fallbacks.map((f, i) => [["roles", k, "fallbacks", i], f]) : [])];
+    for (const [path, t] of targets) {
+      if (!t || typeof t !== "object" || !t.provider) continue;
+      const pv = provOf(t.provider), where = path.includes("fallbacks") ? `备用模型 ${path[3] + 1}` : "主模型";
+      if (!pv) { out.push({ path, message: `${where}：T3 里没有服务商 "${t.provider}"` }); continue; }
+      if (!usable(pv)) out.push({ path, message: `${where}：服务商 ${pv.name} 在 T3 里${pv.enabled ? "还没就绪" : "没有启用"}` });
+      if (!t.model) continue;
+      const m = pv.models.find((x) => x.slug === t.model);
+      if (!m) { out.push({ path, message: `${where}：T3 的 ${pv.name} 里没有模型 "${t.model}"` }); continue; }
+      for (const [ok, ov] of Object.entries(t.options && typeof t.options === "object" ? t.options : {})) {
+        const d = m.options.find((o) => o.id === ok);
+        if (!d) out.push({ path, message: `${where}：${m.name} 不支持参数 ${ok}` });
+        else if (d.type === "select" && d.choices.length && !d.choices.some((c) => c.id === ov)) out.push({ path, message: `${where}：${optName(d)}不能取 "${ov}"，可选 ${d.choices.map((c) => c.id).join(" / ")}` });
+        else if (d.type === "boolean" && typeof ov !== "boolean") out.push({ path, message: `${where}：${optName(d)}只能是开或关` });
+      }
+    }
+  }
+  return out;
+}
+// Drop options the chosen model does not support; returns the dropped keys.
+function pruneOptions(t) {
+  const m = modelOf(t), dropped = [];
+  if (!m || !t.options) return dropped;
+  for (const [k, v] of Object.entries(t.options)) {
+    const d = m.options.find((o) => o.id === k);
+    if (!d || (d.type === "select" && d.choices.length && !d.choices.some((c) => c.id === v))) { delete t.options[k]; dropped.push(k); }
+  }
+  return dropped;
+}
+const getPath = (obj, p) => p.reduce((o, k) => (o == null ? undefined : o[k]), obj);
+function setPath(obj, p, v) {
+  const parent = getPath(obj, p.slice(0, -1)), last = p[p.length - 1];
+  if (v === undefined) delete parent[last]; else parent[last] = v;
+}
+function stageOf(id) { return (state.data.stages || []).find((s) => s.id === id); }
+
+// ---------- sidebar ----------
+const wfTitle = (id) => state.st.workflows.find((w) => w.id === id)?.title || id.replace(/^lib:/, "");
+function assignLabel(a) {
+  if (a.type === "default") return `用：${wfTitle("default")}`;
+  if (a.type === "library") return `用：${wfTitle(`lib:${a.name}`)}`;
+  if (a.type === "custom") return a.errorCount ? `专属工作流 · ${a.errorCount} 个问题` : "专属工作流";
+  if (a.type === "missing") return `引用的「${a.name}」不存在`;
+  return "配置文件有错";
+}
+async function loadState() {
+  state.st = await api("GET", "/api/state");
+  if (state.project) state.project = state.st.projects.find((p) => p.key === state.project.key) || null;
+  renderList();
+}
+function renderList() {
+  const st = state.st;
+  const wfItem = (w) => `<li><button class="wf-item" data-open="${esc(w.id)}" aria-current="${state.sel === w.id}">
+    <span class="dot ${w.errorCount ? "bad" : ""}"></span><span class="t">${esc(w.title)}
+    <small>${w.builtin ? "内置 · " : ""}${w.usedBy.length ? `${w.usedBy.length} 个项目在用` : "没有项目在用"}${w.errorCount ? ` · ${w.errorCount} 个问题` : ""}</small></span></button></li>`;
+  const prItem = (p) => {
+    const a = p.assignment, bad = a.type === "missing" || a.type === "broken" || (a.type === "custom" && a.errorCount);
+    return `<li><button class="wf-item" data-project="${esc(p.key)}" aria-current="${state.sel === `project:${p.key}`}">
+      <span class="dot ${bad ? "bad" : a.type === "default" ? "none" : ""}"></span><span class="t">${esc(p.title)}${p.source === "ledger" ? `<span class="tag">不在 T3</span>` : ""}
+      <small>${esc(assignLabel(a))}</small></span></button></li>`;
+  };
+  const active = st.projects.filter((p) => !p.archived), archived = st.projects.filter((p) => p.archived);
+  $("#list").innerHTML = `<li class="group">工作流</li>${st.workflows.map(wfItem).join("")}
+    <li><button class="wf-item new-wf" data-act="wf-new">${I.plus}<span class="t">新建工作流</span></button></li>
+    <li class="group">T3 项目</li>
+    ${st.t3.ok ? "" : `<li class="note bad">${esc(st.t3.error)}</li>`}
+    ${active.map(prItem).join("") || `<li class="note">T3 里还没有项目</li>`}
+    ${archived.length ? `<li class="group">T3 已归档</li>${archived.map(prItem).join("")}` : ""}`;
+  $$("#list > li").forEach((li, i) => li.style.setProperty("--row-i", i));
+  positionNavIndicator(navHasPosition);
+}
+
+// ---------- open / save ----------
+const leaveOk = () => !dirty() || confirm("有修改还没保存，确定离开吗？");
+async function loadEditor(id) {
+  const r = await api("GET", `/api/workflow?id=${encodeURIComponent(id)}`);
+  state.cur = r; state.data = r.data; state.saved = r.data === null ? "" : JSON.stringify(r.data);
+  state.openRole = null; state.jsonDraft = null;
+  savedUntil = 0; clearTimeout(savedResetTimer); dirtyWas = false;
+}
+function clearEditor() { state.cur = null; state.data = null; state.saved = ""; state.openRole = null; state.jsonDraft = null; savedUntil = 0; clearTimeout(savedResetTimer); dirtyWas = false; }
+async function openWorkflow(id, force = false) {
+  if (!force && !leaveOk()) return;
+  closeNav();
+  try {
+    await loadEditor(id);
+    await runViewTransition(() => {
+      state.sel = id; state.project = null;
+      renderList(); render();
+      const main = $("#main"); if (main) main.scrollTop = 0;
+    });
+  } catch (e) { toast(e.message, true); }
+}
+async function openProject(key, force = false) {
+  if (!force && !leaveOk()) return;
+  closeNav();
+  const p = state.st.projects.find((x) => x.key === key);
+  if (!p) return openWorkflow("default", true);
+  try { if (p.assignment.type === "custom") await loadEditor(`project:${key}`); else clearEditor(); }
+  catch (e) { clearEditor(); toast(e.message, true); }
+  await runViewTransition(() => {
+    state.project = p; state.sel = `project:${key}`;
+    renderList(); render();
+    const main = $("#main"); if (main) main.scrollTop = 0;
+  });
+}
+const reopen = () => (state.project ? openProject(state.project.key, true) : openWorkflow(state.sel, true));
+async function save() {
+  if (state.issues.length) { toast(`还有 ${state.issues.length} 个问题需要修正`, true); shakeSave(); return; }
+  try {
+    const r = await api("PUT", `/api/workflow?id=${encodeURIComponent(state.cur.id)}`, { data: state.data, baseMtime: state.cur.mtime });
+    state.cur.mtime = r.mtime; state.saved = JSON.stringify(state.data);
+    await loadState();
+    savedUntil = Date.now() + 1200;
+    clearTimeout(savedResetTimer);
+    refresh();
+    savedResetTimer = setTimeout(() => { savedUntil = 0; refresh(); }, 1200);
+    toast("已保存（旧版本已自动备份）");
+  } catch (e) {
+    savedUntil = 0;
+    clearTimeout(savedResetTimer);
+    refresh();
+    requestAnimationFrame(shakeSave);
+    if (e.status === 409) toast("这个文件刚被别的程序改过。请先点“高级”里的重新加载，再改一次。", true);
+    else toast(e.status === 422 ? (e.payload.errors || [e.message]).join("；") : e.message, true);
+  }
+}
+async function assign(value) {
+  const p = state.project, a = p.assignment;
+  if (a.type === "custom" && value !== "custom" && !confirm("这个项目的专属工作流会先备份再移除，确定换成别的吗？")) return render();
+  if (dirty() && !confirm("专属工作流有修改还没保存，切换会丢掉这些修改。继续吗？")) return render();
+  try {
+    await api("POST", "/api/project/assign", { key: p.key, use: value });
+    toast(value === "custom" ? "已为这个项目复制一份专属工作流，可以在下面修改" : `已改为使用「${wfTitle(value)}」`);
+    state.saved = JSON.stringify(state.data);
+    await loadState(); await openProject(p.key, true);
+  } catch (e) { toast(e.message, true); render(); }
+}
+function newWorkflow(from = "default") {
+  const dlg = $("#dlg-new"), f = $("#form-new");
+  f.reset();
+  f.elements.from.innerHTML = state.st.workflows.filter((w) => !w.errorCount).map((w) => `<option value="${esc(w.id)}" ${w.id === from ? "selected" : ""}>${esc(w.title)}</option>`).join("");
+  dlg.showModal();
+}
+async function createWorkflow(form) {
+  try {
+    const r = await api("POST", "/api/library/create", { name: form.elements.name.value.trim(), title: form.elements.title.value.trim(), from: form.elements.from.value });
+    $("#dlg-new").close();
+    toast("已创建，可以开始修改了");
+    await loadState(); await openWorkflow(r.id, true);
+  } catch (e) { toast(e.message, true); }
+}
+async function deleteWorkflow() {
+  const c = state.cur, w = state.st.workflows.find((x) => x.id === c.id);
+  if (w?.usedBy?.length) { toast(`还有项目在用：${w.usedBy.join("、")}。请先给它们换一个工作流。`, true); return; }
+  if (!confirm(`删除工作流「${w?.title || c.name}」？文件会改名保留在原目录，可以手动找回。`)) return;
+  try { await api("POST", "/api/library/delete", { name: c.name }); toast("已删除"); state.saved = JSON.stringify(state.data); await loadState(); await openWorkflow("default", true); }
+  catch (e) { toast(e.message, true); }
+}
+
+// ---------- render ----------
+const EDITOR = `<section class="block" id="sec-flow"></section>
+  <section class="block" id="sec-roles"></section>
+  <section class="block" id="sec-rules"></section>
+  <details class="advanced" id="sec-adv"></details>`;
+function mountEditor() {
+  const providers = new Set(), models = new Set();
+  for (const r of Object.values(state.data.roles || {})) for (const t of [r.target, ...(r.fallbacks || [])]) { if (t?.provider) providers.add(t.provider); if (t?.model) models.add(t.model); }
+  $("#dl-provider").innerHTML = [...providers].map((v) => `<option value="${esc(v)}">`).join("");
+  $("#dl-model").innerHTML = [...models].map((v) => `<option value="${esc(v)}">`).join("");
+  renderFlow(); renderRoles(); renderRules(); renderAdvanced(); refresh();
+}
+function brokenFile() {
+  return `<div class="empty-state"><p style="color:var(--error)"><b>这个文件不是合法的 JSON，面板没法打开。</b></p>
+    <p class="path">${esc(state.cur.file)}</p><p>${(state.cur.errors || []).map(esc).join("<br>")}</p>
+    <p>请用文本编辑器修好后再点：</p><button class="btn" data-act="reload">重新加载</button></div>`;
+}
+function topbarHTML({ title, tag = "", actions = "", editable = false }) {
+  return `<header class="topbar"><div class="topbar-inner">
+    <div class="topbar-title"><h2>${title}</h2>${tag ? `<span class="tag">${tag}</span>` : ""}</div>
+    <div class="topbar-actions">${actions}${editable ? `<span class="topbar-sep" aria-hidden="true"></span><div class="save-actions" id="save-actions"></div>` : ""}</div>
+  </div></header>`;
+}
+function render() {
+  if (!pageEntered) requestAnimationFrame(playEntry);
+  const m = $("#main");
+  if (state.project) return renderProject();
+  const c = state.cur;
+  if (!c) { m.innerHTML = ""; return; }
+  const w = state.st.workflows.find((x) => x.id === c.id), isDefault = c.kind === "default";
+  const actions = `<button class="btn ghost small" data-act="wf-new" data-from="${esc(c.id)}" aria-label="复制一份" title="复制一份">${I.copy}<span class="wide-label">复制一份</span></button>
+    ${isDefault ? "" : `<button class="btn ghost small danger" data-act="wf-del" aria-label="删除" title="删除">${I.trash}<span class="wide-label">删除</span></button>`}`;
+  const top = topbarHTML({ title: esc(w?.title || c.name), tag: isDefault ? "内置" : "", actions, editable: state.data !== null });
+  const used = w?.usedBy?.length ? `在用的项目：${w.usedBy.map(esc).join("、")}` : "目前没有项目在用。在左边点一个项目，就可以让它改用这个工作流。";
+  const intro = `<div class="page-intro">
+    <p class="intro-line">工作流决定 Chief 拿到任务后分哪几步做、每一步派给谁、每个角色用什么模型。<span class="intro-meta">${used}</span></p>
+    <p class="info-line">${I.info}<span>${isDefault ? "这是安装目录里的默认工作流，保存后需重新运行 install.sh 才会生效" : "保存后，下一个 Chief 线程开工时生效"}</span></p>
+  </div>`;
+  if (state.data === null) { m.innerHTML = `${top}<div class="page">${intro}${brokenFile()}</div>`; return; }
+  m.innerHTML = `${top}<div class="page">${intro}${EDITOR}</div><div class="savebar" id="savebar" hidden></div>`;
+  mountEditor();
+}
+function renderProject() {
+  const p = state.project, a = p.assignment, m = $("#main");
+  const cur = a.type === "default" ? "default" : a.type === "library" ? `lib:${a.name}` : a.type === "custom" ? "custom" : "";
+  const opt = (value, title, sub) => `<label class="choice"><input type="radio" name="use" value="${esc(value)}" data-act="assign" ${cur === value ? "checked" : ""}>
+    <span><b>${esc(title)}</b><small>${esc(sub)}</small></span></label>`;
+  const notice = a.type === "missing" ? `<p class="notice bad">这个项目引用了工作流「${esc(a.name)}」，但它已经不存在。Chief 会停止派单，请重新选择。</p>`
+    : a.type === "broken" ? `<p class="notice bad">项目的 workflow.json 有错（${esc(a.error)}），Chief 会停止派单。请重新选择一个工作流。</p>` : "";
+  const shared = cur && cur !== "custom"
+    ? `<button class="btn ghost small" data-open="${esc(cur)}" aria-label="编辑「${esc(wfTitle(cur))}」" title="编辑「${esc(wfTitle(cur))}」">${I.pencil}<span class="wide-label">编辑「${esc(wfTitle(cur))}」</span><span class="narrow-label">编辑</span></button>` : "";
+  const hasEditor = a.type === "custom" && !!state.cur && state.data !== null;
+  const top = topbarHTML({ title: esc(p.title), tag: p.source === "ledger" ? "不在 T3" : "", actions: shared, editable: hasEditor });
+  const intro = `<div class="page-intro">
+    ${p.roots.map((r) => `<p class="intro-line intro-path">${esc(r)}</p>`).join("")}
+    <p class="info-line">${I.info}<span>选中即生效：之后在这个项目里开工的 Chief 线程会按它来派单。</span></p>
+    ${shared ? `<p class="info-line">${I.info}<span>修改共享工作流会影响所有使用它的项目。</span></p>` : ""}
+    ${p.source === "ledger" ? `<p class="info-line warn">${I.alert}<span>T3 里没有找到这个项目，它只出现在任务台账目录 ${esc(state.st.ledgerDir)}。</span></p>` : ""}
+  </div>`;
+  const assignment = `<section class="block"><div class="block-title"><h3>这个项目用哪个工作流</h3></div>
+      <div class="choices">${state.st.workflows.map((w) => opt(w.id, w.title, w.builtin ? "没有单独选择的项目都用它" : `工作流库 · ${w.name}`)).join("")}
+        ${opt("custom", "专属工作流", "复制一份只给这个项目用，可以单独修改")}</div>
+      ${notice}</section>`;
+  if (!hasEditor) {
+    const broken = a.type === "custom" && state.cur && state.data === null ? brokenFile() : "";
+    m.innerHTML = `${top}<div class="page">${intro}${assignment}${broken}</div>`;
+    return;
+  }
+  m.innerHTML = `${top}<div class="page">${intro}${assignment}
+    <section class="block"><div class="block-title"><h3>专属工作流设置</h3></div>
+      <p class="block-desc">保存后，下一个 Chief 线程开工时生效。</p>
+      ${EDITOR}</section></div><div class="savebar" id="savebar" hidden></div>`;
+  mountEditor();
+}
+
+function renderFlow() {
+  const roles = Object.keys(state.data.roles || {});
+  const added = justAddedChip;
+  const toggle = flowToggle;
+  justAddedChip = null;
+  flowToggle = null;
+  $("#sec-flow").innerHTML = `
+    <div class="block-title"><h3>流程</h3><span class="n">${STEPS.length} 步</span></div>
+    <p class="block-desc">按 1 → 4 的顺序进行。关掉的步骤会被跳过；勾选“每个任务都要”后，Chief 不能省略这一步。</p>
+    <div class="flow-wrap">
+      <div class="flow-line" aria-hidden="true"></div>
+      <span class="flow-spark" aria-hidden="true"></span>
+      <div class="flow">${STEPS.map((def, n) => {
+      const s = stageOf(def.id), on = !!s?.enabled;
+      const idx = state.data.stages.indexOf(s);
+      const assigned = s?.roles || [];
+      const free = roles.filter((r) => !assigned.includes(r));
+      const turning = toggle && toggle.id === def.id ? (toggle.on ? " is-turning-on" : " is-turning-off") : "";
+      return `<div class="step${on ? "" : " off"}${turning}" data-step="${def.id}">
+        <div class="step-top">
+          <span class="step-num">${n + 1}</span><span class="step-name">${def.name}</span>
+          ${def.always ? `<span class="who">必有</span>` : `<label class="switch" title="${on ? "关闭" : "开启"}这一步"><input type="checkbox" data-act="step-toggle" data-id="${def.id}" ${on ? "checked" : ""} aria-label="开启${def.name}"><span></span></label>`}
+        </div>
+        <p class="step-hint">${def.hint}</p>
+        ${on ? `<div class="step-body">
+          ${def.always ? "" : `<label class="check"><input type="checkbox" data-act="step-required" data-i="${idx}" ${s.required ? "checked" : ""}> 每个任务都要</label>`}
+          <span class="who">由谁来做</span>
+          <div class="people">
+            ${assigned.map((k) => {
+              const r = state.data.roles[k];
+              const isNew = added && added.step === idx && added.key === k;
+              return `<div class="person${r ? "" : " missing"}${isNew ? " is-new" : ""}" title="${r ? esc(`${roleName(k)}：${r.purpose}\n${r.target?.provider || ""} / ${modelSummary(r.target)}`) : "这个角色不存在"}">
+                <span class="person-text"><span class="nm">${esc(r ? roleName(k) : k)}</span><span class="md">${r ? esc(modelSummary(r.target)) : "不存在"}</span></span>
+                <button class="icon-btn" data-act="step-unassign" data-i="${idx}" data-key="${esc(k)}" aria-label="从${def.name}移除 ${esc(k)}" title="移除">${I.x}</button></div>`;
+            }).join("")}
+            ${free.length ? `<select class="add-select" data-act="step-assign" data-i="${idx}" aria-label="给${def.name}添加角色"><option value="">添加角色</option>${free.map((k) => `<option value="${esc(k)}">${esc(roleName(k))}</option>`).join("")}</select>` : ""}
+          </div>
+          <div class="step-issues" data-step-issues="${idx}"></div>
+        </div>` : def.id === "review" ? `<p class="warn-text">${I.alert}<span>已关闭：Chief 汇报时会注明“未经独立审查”。</span></p>` : ""}
+      </div>`;
+    }).join("")}</div>
+    </div>`;
+
+  requestAnimationFrame(() => {
+    layoutFlowSignal();
+    if (!signalPlayed) {
+      signalPlayed = true;
+      if (!reduceMotion() && flowLineEnabled()) setTimeout(signalInitialFlow, 300);
+    }
+  });
+}
+
+function effortControl(p, t) {
+  const e = effortOf(t);
+  const key = e?.key || "";
+  const val = e ? String(e.value) : "";
+  const known = Object.keys(EFFORT_LEVELS);
+  // No effort key yet: picking a level adds reasoningEffort (other keys live under 更多设置).
+  return `<label class="field"><span>${EFFORT_KEYS[key || "reasoningEffort"]}</span>
+    <select data-act="effort" data-p="${P(p)}" data-key="${esc(key || "reasoningEffort")}">
+      <option value="" ${key ? "" : "selected"}>不设置</option>
+      ${known.map((l) => `<option value="${l}" ${l === val ? "selected" : ""}>${EFFORT_LEVELS[l]}（${l}）</option>`).join("")}
+      ${val && !known.includes(val) ? `<option value="${esc(val)}" selected>${esc(val)}</option>` : ""}
+    </select></label>`;
+}
+
+function modelCard(p, t, title, actions = "") {
+  if (t3On()) return t3ModelCard(p, t, title, actions);
+  return `<div class="model-card" data-card="${P(p)}">
+    <div class="head"><span class="grow">${title}</span>${actions}</div>
+    <div class="model-grid">
+      <label class="field"><span>Provider</span><input class="mono" list="dl-provider" data-bind="${P([...p, "provider"])}" value="${esc(t.provider)}" placeholder="如 codex"></label>
+      <label class="field"><span>模型</span><input class="mono" list="dl-model" data-bind="${P([...p, "model"])}" value="${esc(t.model)}" placeholder="准确的模型 ID"></label>
+      ${effortControl(p, t)}
+    </div>
+  </div>`;
+}
+
+function t3ModelCard(p, t, title, actions) {
+  const pv = provOf(t.provider), m = modelOf(t);
+  const provOpts = (t.provider ? "" : `<option value="" selected>请选择</option>`) +
+    state.t3.providers.map((x) => `<option value="${esc(x.id)}" ${x.id === t.provider ? "selected" : ""}>${esc(x.name)}（${esc(x.id)}）${usable(x) ? "" : " · 未启用"}</option>`).join("") +
+    (t.provider && !pv ? `<option value="${esc(t.provider)}" selected>(!) ${esc(t.provider)}（T3 里没有）</option>` : "");
+  const modelField = pv
+    ? `<select data-act="t3-model" data-p="${P(p)}">${t.model ? "" : `<option value="" selected>请选择模型</option>`}
+        ${pv.models.map((x) => `<option value="${esc(x.slug)}" ${x.slug === t.model ? "selected" : ""}>${esc(x.name === x.slug ? x.slug : `${x.name} — ${x.slug}`)}</option>`).join("")}
+        ${t.model && !m ? `<option value="${esc(t.model)}" selected>(!) ${esc(t.model)}（不在 T3 列表）</option>` : ""}</select>`
+    : `<input class="mono" list="dl-model" data-bind="${P([...p, "model"])}" value="${esc(t.model)}" placeholder="准确的模型 ID">`;
+  const opts = m ? m.options.map((d) => {
+    const cur = t.options?.[d.id];
+    const def = d.choices.find((c) => c.isDefault);
+    const items = d.type === "boolean"
+      ? [["true", "开", cur === true], ["false", "关", cur === false]]
+      : d.choices.map((c) => [c.id, choiceName(c), c.id === cur]);
+    return `<label class="field"><span>${esc(optName(d))}</span><select data-act="t3-opt" data-p="${P(p)}" data-key="${esc(d.id)}" data-type="${esc(d.type)}">
+      <option value="" ${cur === undefined ? "selected" : ""}>不设置${def ? `（T3 默认：${esc(CHOICE_NAMES[def.id] || def.label)}）` : ""}</option>
+      ${items.map(([v, l, sel]) => `<option value="${esc(v)}" ${sel ? "selected" : ""}>${esc(l)}</option>`).join("")}</select></label>`;
+  }).join("") : effortControl(p, t);
+  return `<div class="model-card" data-card="${P(p)}">
+    <div class="head"><span class="grow">${title}</span>${actions}</div>
+    <div class="model-grid t3">
+      <label class="field"><span>服务商</span><select data-act="t3-provider" data-p="${P(p)}">${provOpts}</select></label>
+      <label class="field"><span>模型${pv ? `（${pv.models.length} 个）` : ""}</span>${modelField}</label>
+    </div>
+    ${opts ? `<div class="opt-grid">${opts}</div>` : m ? `<p class="who" style="margin:8px 0 0">这个模型在 T3 里没有可调参数</p>` : ""}
+    <div class="card-warn" data-card-warn="${P(p)}"></div>
+  </div>`;
+}
+
+function optionsEditor(p, t) {
+  const opts = Object.entries(t.options || {});
+  return `<div class="field"><span>${esc(p.includes("fallbacks") ? `备用模型 ${p[p.length - 1] + 1}` : "主模型")}的全部参数（原样放进 target.options）</span>
+    ${opts.map(([k, v]) => `<div class="kv">
+      <input class="mono" aria-label="参数名" data-optkey="${P([...p, "options"])}" data-old="${esc(k)}" value="${esc(k)}">
+      <input class="mono" aria-label="参数值" data-bind="${P([...p, "options", k])}" data-type="literal" value="${esc(typeof v === "string" ? v : JSON.stringify(v))}">
+      <button class="icon-btn" data-act="opt-del" data-p="${P([...p, "options", k])}" title="删除参数" aria-label="删除参数 ${esc(k)}">${I.x}</button>
+    </div>`).join("")}
+    <div><button class="btn small" data-act="opt-add" data-p="${P([...p, "options"])}" style="margin-top:6px">${I.plus} 参数</button></div>
+  </div>`;
+}
+
+function renderRoles() {
+  const roles = state.data.roles || {};
+  const keys = Object.keys(roles);
+  const just = justOpenedRole;
+  justOpenedRole = null;
+  const stepsOf = (k) => STEPS.filter((d) => stageOf(d.id)?.roles?.includes(k)).map((d) => d.name);
+  $("#sec-roles").innerHTML = `
+    <div class="block-title"><h3>角色与模型</h3><span class="n">${keys.length}</span></div>
+    <p class="block-desc">每个角色是一类 Worker。点开可以换模型、加备用模型。主模型不可用时，Chief 只会按顺序换成你列出的备用模型。</p>
+    ${syncLine()}
+    <div class="roles">${keys.map((k) => {
+      const r = roles[k], p = ["roles", k], open = state.openRole === k;
+      const isJust = just === k;
+      const steps = stepsOf(k);
+      return `<div class="role${open ? " open" : ""}${isJust ? " just-opened" : ""}" data-role="${esc(k)}">
+        <button class="role-row" data-act="role-toggle" data-key="${esc(k)}" aria-expanded="${open}">
+          <span class="role-name"><b>${esc(roleName(k))}<span class="badge-bad" data-role-badge="${esc(k)}" hidden></span><span class="badge-warn" data-role-warn="${esc(k)}" hidden></span></b><small>${steps.length ? `用于：${steps.join("、")}` : "还没用在任何步骤"}</small></span>
+          <span class="role-purpose">${esc(r.purpose) || "（未填写）"}</span>
+          <span class="role-model"><span class="m">${esc(modelSummary(r.target))}</span><small><span class="role-provider">${esc(r.target?.provider || "")}</span>${r.fallbacks?.length ? `<span class="role-fb-badge">备用 ${r.fallbacks.length} 个</span>` : ""}</small></span>
+          <span class="chev" aria-hidden="true">${I.chevron}</span>
+        </button>
+        <div class="role-edit-wrap${open && !isJust ? " is-open" : ""}" data-role-edit="${esc(k)}"${open ? "" : " inert"}>
+          <div class="role-edit-clip">
+          <div class="role-edit">
+          <div class="sub-title">基本</div>
+          <div class="role-basic">
+            <label class="field"><span>名称</span><input data-bind="${P([...p, "label"])}" data-type="optional" value="${esc(r.label)}" placeholder="${esc(k)}"></label>
+            <label class="field"><span>负责什么</span><input data-bind="${P([...p, "purpose"])}" value="${esc(r.purpose)}" placeholder="一句话说明这个角色做什么"></label>
+          </div>
+          <div class="sub-title">模型</div>
+          ${modelCard([...p, "target"], r.target || {}, "主模型")}
+          ${(r.fallbacks || []).map((f, i) => modelCard([...p, "fallbacks", i], f, `备用模型 ${i + 1}`,
+            `${i > 0 ? `<button class="btn link small" data-act="fb-up" data-key="${esc(k)}" data-i="${i}">上移</button>` : ""}
+             <button class="btn link small danger" data-act="fb-del" data-key="${esc(k)}" data-i="${i}">删除</button>`)).join("")}
+          <button class="btn small" data-act="fb-add" data-key="${esc(k)}" style="margin-top:8px">${I.plus} 备用模型</button>
+          <details class="more"><summary>${I.chevron}<span>更多设置</span></summary>
+            <div class="grid">
+              <label class="field"><span>任务类型（派单时的 role）</span><select data-bind="${P([...p, "delegateRole"])}">
+                ${Object.entries(TASK_TYPES).map(([v, l]) => `<option value="${v}" ${v === r.delegateRole ? "selected" : ""}>${l}（${v}）</option>`).join("")}</select></label>
+              <label class="field"><span>权限</span><select data-bind="${P([...p, "access"])}">
+                <option value="readonly" ${r.access === "readonly" ? "selected" : ""}>只读，不改文件</option>
+                <option value="write" ${r.access === "write" ? "selected" : ""}>可以改文件</option></select></label>
+              <label class="field"><span>汇报最多多少字（可留空）</span><input type="number" min="50" step="50" data-bind="${P([...p, "reportLimit"])}" data-type="optint" value="${esc(r.reportLimit)}"></label>
+            </div>
+            <div style="margin-top:12px">${optionsEditor([...p, "target"], r.target || {})}</div>
+            ${(r.fallbacks || []).map((f, i) => `<div style="margin-top:12px">${optionsEditor([...p, "fallbacks", i], f)}</div>`).join("")}
+            <div class="role-actions">
+              <button class="btn small" data-act="role-rename" data-key="${esc(k)}">修改内部键名（${esc(k)}）</button>
+              <button class="btn small danger" data-act="role-del" data-key="${esc(k)}">删除这个角色</button>
+            </div>
+          </details>
+          <div class="step-issues" data-role-issues="${esc(k)}"></div>
+          </div>
+          </div>
+        </div>
+      </div>`;
+    }).join("")}</div>
+    <button class="btn" data-act="role-add" style="margin-top:10px">${I.plus} 新角色</button>`;
+
+  if (just && state.openRole === just) {
+    const token = ++roleOpenToken;
+    requestAnimationFrame(() => requestAnimationFrame(() => {
+      if (token !== roleOpenToken || state.openRole !== just) return;
+      const wrap = $(`[data-role-edit="${CSS.escape(just)}"]`);
+      if (!wrap) return;
+      wrap.classList.add("is-open");
+      wrap.removeAttribute("inert");
+    }));
+  }
+}
+
+function syncLine() {
+  const t = state.t3;
+  if (!t) return "";
+  if (!t3On()) return `<p class="sync bad"><span class="sync-text">${I.alert}<span>没读到 T3 的服务商列表（${esc(t.error || "缓存为空")}），只能手动填写服务商和模型。打开一次 T3 Code 后点</span></span><button class="btn ghost small" data-act="t3-reload">${I.refresh}<span>重新读取</span></button></p>`;
+  const ok = t.providers.filter(usable), times = t.providers.map((p) => p.checkedAt).filter(Boolean).sort();
+  const when = times.length ? new Date(times[times.length - 1]).toLocaleString() : "未知";
+  return `<p class="sync"><span class="sync-text">${I.info}<span>服务商和模型同步自 T3 Code：${ok.length} 个可用（${ok.map((p) => esc(p.name)).join("、")}），T3 最近检查于 ${esc(when)}。</span></span>
+    <button class="btn ghost small" data-act="t3-reload">${I.refresh}<span>重新读取</span></button></p>`;
+}
+
+function renderRules() {
+  const l = state.data.limits || {};
+  $("#sec-rules").innerHTML = `
+    <div class="block-title"><h3>规则</h3><span class="n">${RULES.length} 条</span></div>
+    <p class="block-desc">直接改数字即可。</p>
+    <div class="rules">${RULES.map((r) => `<label class="rule">${r.before}
+      <input type="number" min="${r.min}" max="${r.max}" data-bind="${P(["limits", r.key])}" data-type="int" value="${esc(l[r.key])}" aria-label="${r.before}…${r.after}">
+      ${r.after}</label>`).join("")}</div>
+    <ul class="fixed">
+      <li>以下规则始终生效，不能在这里关闭：审查模型必须和实现模型不同；不用备用列表以外的模型；等待任务时不轮询；合并、提交、推送、删除需要你明确授权。</li>
+    </ul>`;
+}
+
+function renderAdvanced() {
+  const c = state.cur;
+  const adv = $("#sec-adv");
+  adv.innerHTML = `<summary>${I.chevron}<span>高级</span></summary><div class="inner">
+    <div class="grid">
+      <label class="field"><span>显示名称</span><input data-bind="${P(["title"])}" data-type="optional" value="${esc(state.data.title)}" placeholder="${esc(state.data.name)}"></label>
+      <label class="field"><span>${c.kind === "library" ? "内部名称（和文件名一致，不能改）" : "内部名称（小写字母、数字、连字符）"}</span><input class="mono" data-bind="${P(["name"])}" value="${esc(state.data.name)}" ${c.kind === "library" ? "readonly" : ""}></label>
+      <label class="field wide"><span>描述</span><input data-bind="${P(["description"])}" data-type="optional" value="${esc(state.data.description)}"></label>
+    </div>
+    <div class="field"><span>文件位置</span><span class="path">${esc(c.file)}</span></div>
+    <div><button class="btn small" data-act="reload">从磁盘重新加载</button></div>
+    <div class="field"><span>直接编辑 JSON（改完点“应用”）</span>
+      <textarea class="json" id="json-text" spellcheck="false" aria-label="工作流 JSON">${esc(state.jsonDraft ?? JSON.stringify(state.data, null, 2))}</textarea>
+      <div style="display:flex;gap:10px;align-items:center;margin-top:6px"><button class="btn small" id="json-apply" disabled>应用</button><span id="json-state" style="font-size:12px;color:var(--muted-foreground)"></span></div>
+    </div></div>`;
+  adv.addEventListener("toggle", () => { if (adv.open && state.jsonDraft === null) $("#json-text").value = JSON.stringify(state.data, null, 2); });
+  const ta = $("#json-text");
+  ta.addEventListener("input", () => {
+    state.jsonDraft = ta.value;
+    try { JSON.parse(ta.value); $("#json-state").textContent = "格式正确，点“应用”更新上面的表单"; $("#json-apply").disabled = false; }
+    catch (e) { $("#json-state").textContent = `JSON 格式错误：${e.message}`; $("#json-apply").disabled = true; }
+    refresh();
+  });
+  $("#json-apply").onclick = () => {
+    try { state.data = JSON.parse(state.jsonDraft); state.jsonDraft = null; const wasOpen = adv.open; render(); $("#sec-adv").open = wasOpen; toast("已应用到表单，记得保存"); }
+    catch (e) { toast(e.message, true); }
+  };
+}
+
+// Field-level issue marking, badges and the save bar — no re-render, keeps focus.
+function refresh() {
+  if (!state.data) return;
+  state.issues = findIssues(state.data);
+  state.warns = t3Warnings(state.data);
+  $$(".invalid").forEach((el) => el.classList.remove("invalid"));
+  $$("[data-role-badge]").forEach((b) => (b.hidden = true));
+  $$(".step.has-issue").forEach((s) => s.classList.remove("has-issue"));
+  $$("[data-step-issues],[data-role-issues],[data-card-warn]").forEach((d) => (d.innerHTML = ""));
+  $$(".model-card.warn").forEach((c) => c.classList.remove("warn"));
+  $$("[data-role-warn]").forEach((b) => (b.hidden = true));
+  const warnCount = {};
+  for (const w of state.warns) {
+    warnCount[w.path[1]] = (warnCount[w.path[1]] || 0) + 1;
+    const card = $$(".model-card").find((c) => c.dataset.card === JSON.stringify(w.path));
+    if (card) { card.classList.add("warn"); const box = card.querySelector("[data-card-warn]"); if (box) box.innerHTML += `<p class="warn-text">${I.alert}<span>${esc(w.message)}</span></p>`; }
+  }
+  for (const [k, n] of Object.entries(warnCount)) { const b = $(`[data-role-warn="${CSS.escape(k)}"]`); if (b) { b.hidden = false; b.textContent = `${n} 处和 T3 不一致`; } }
+  const roleCount = {}, stepMsgs = {}, roleMsgs = {};
+  for (const is of state.issues) {
+    const field = $$("[data-bind]").find((el) => samePath(JSON.parse(el.dataset.bind), is.path));
+    if (field) field.classList.add("invalid");
+    if (is.path[0] === "roles" && is.path[1]) {
+      roleCount[is.path[1]] = (roleCount[is.path[1]] || 0) + 1;
+      (roleMsgs[is.path[1]] ||= []).push(is.message);
+    }
+    if (is.path[0] === "stages" && typeof is.path[1] === "number") (stepMsgs[is.path[1]] ||= []).push(is.message);
+  }
+  for (const [k, n] of Object.entries(roleCount)) {
+    const b = $(`[data-role-badge="${CSS.escape(k)}"]`); if (b) { b.hidden = false; b.textContent = n; }
+    const d = $(`[data-role-issues="${CSS.escape(k)}"]`); if (d) d.innerHTML = roleMsgs[k].map((m) => `<p class="issue-text">${I.alert}<span>${esc(m)}</span></p>`).join("");
+  }
+  for (const [i, msgs] of Object.entries(stepMsgs)) {
+    const id = state.data.stages[i]?.id;
+    const card = $(`[data-step="${CSS.escape(String(id))}"]`); if (card) card.classList.add("has-issue");
+    const d = $(`[data-step-issues="${i}"]`); if (d) d.innerHTML = msgs.map((m) => `<p class="issue-text">${I.alert}<span>${esc(m)}</span></p>`).join("");
+  }
+
+  const d = dirty(), n = state.issues.length, pendingJson = state.jsonDraft !== null;
+  const changed = changedFields();
+  const showDirty = !!(d || n || pendingJson);
+  const pop = showDirty && !dirtyWas;
+  dirtyWas = showDirty;
+  const actions = $("#save-actions");
+  if (actions) {
+    const savedNow = Date.now() < savedUntil;
+    actions.innerHTML = savedNow
+      ? `<button class="btn ghost small" id="revert" disabled><span>撤销<span class="wide-label">修改</span></span></button>
+        <button class="btn primary small is-saved" id="save" disabled>${I.check}<span>已保存</span></button>`
+      : `${n || pendingJson ? `<span class="dirty-indicator${n ? " bad" : ""}${pop ? " pop" : ""}" title="${n ? `${n} 个问题需要修正` : "JSON 有改动还没应用"}">${n ? `${n} 个问题` : "JSON 未应用"}</span>` : ""}
+        <button class="btn ghost small" id="revert" ${d ? "" : "disabled"}><span>撤销<span class="wide-label">修改</span></span></button>
+        <button class="btn primary small" id="save" ${d && !n && !pendingJson ? "" : "disabled"}>${d && !changed ? `<span class="save-dot"></span>` : ""}${changed ? `保存 · ${changed} 处` : "保存"}</button>`;
+    $("#save").onclick = save;
+    $("#revert").onclick = () => { if (confirm("放弃所有还没保存的修改？")) { state.data = JSON.parse(state.saved); state.jsonDraft = null; render(); } };
+  }
+
+  const bar = $("#savebar"); if (!bar) return;
+  const show = !!(d || n || pendingJson || state.warns.length);
+  if (!show) {
+    bar.classList.remove("is-open");
+    clearTimeout(savebarHideTimer);
+    savebarHideTimer = setTimeout(() => { bar.hidden = true; bar.innerHTML = ""; }, 190);
+    return;
+  }
+  const msg = n ? `<span class="msg bad">有 ${n} 个问题需要先修正：
+      <ul class="problems">${state.issues.slice(0, 5).map((is, i) => `<li><button data-act="goto" data-i="${i}">${esc(describe(is))}</button></li>`).join("")}${n > 5 ? `<li>……还有 ${n - 5} 个</li>` : ""}</ul></span>`
+    : pendingJson ? `<span class="msg dirty">JSON 有改动还没应用</span>`
+    : state.warns.length ? `<span class="msg dirty">${d ? "有修改还没保存。" : ""}有 ${state.warns.length} 处和 T3 当前的服务商 / 模型不一致（可以保存，但 Chief 派单时可能用不了）：
+      <ul class="problems warn">${state.warns.slice(0, 5).map((w, i) => `<li><button data-act="goto-warn" data-i="${i}">${esc(describe(w))}</button></li>`).join("")}${state.warns.length > 5 ? `<li>……还有 ${state.warns.length - 5} 处</li>` : ""}</ul></span>`
+    : `<span class="msg dirty">有修改还没保存</span>`;
+  clearTimeout(savebarHideTimer);
+  const wasHidden = bar.hidden;
+  bar.hidden = false;
+  bar.innerHTML = msg;
+  if (!bar.classList.contains("is-open")) {
+    if (wasHidden) requestAnimationFrame(() => bar.classList.add("is-open"));
+    else bar.classList.add("is-open");
+  }
+}
+
+function describe(is) {
+  const [a, b] = is.path;
+  if (a === "roles" && b) return `角色「${roleName(b)}」：${is.message}`;
+  if (a === "stages" && typeof b === "number") return `步骤「${STEPS.find((s) => s.id === state.data.stages[b]?.id)?.name || b}」：${is.message}`;
+  if (a === "limits") return `规则：${is.message}`;
+  return is.message;
+}
+
+function gotoIssue(is) {
+  const [a, b] = is.path;
+  let target;
+  if (a === "roles" && b && state.data.roles[b]) {
+    if (state.openRole !== b) { state.openRole = b; renderRoles(); refresh(); }
+    target = $$("[data-bind]").find((el) => samePath(JSON.parse(el.dataset.bind), is.path))
+      || $$(".model-card").find((c) => c.dataset.card === JSON.stringify(is.path))
+      || $(`[data-role="${CSS.escape(b)}"]`);
+    const more = target?.closest("details"); if (more) more.open = true;
+  } else if (a === "stages" && typeof b === "number") target = $(`[data-step="${CSS.escape(String(state.data.stages[b]?.id))}"]`);
+  else if (a === "limits") target = $("#sec-rules");
+  else { $("#sec-adv").open = true; target = $$("[data-bind]").find((el) => samePath(JSON.parse(el.dataset.bind), is.path)) || $("#sec-adv"); }
+  if (!target) return;
+  target.scrollIntoView({ behavior: scrollMode(), block: "center" });
+  target.classList.remove("flash"); void target.offsetWidth; target.classList.add("flash");
+  if (target.matches("input,select")) target.focus({ preventScroll: true });
+}
+
+// ---------- events ----------
+function parseValue(el) {
+  const type = el.dataset.type;
+  if (type === "int" || type === "optint") return el.value === "" ? undefined : Number(el.value);
+  if (type === "optional") return el.value === "" ? undefined : el.value;
+  if (type === "literal") {
+    const v = el.value.trim();
+    return v === "true" || v === "false" || v === "null" || /^-?\d+(\.\d+)?$/.test(v) ? JSON.parse(v) : el.value;
+  }
+  return el.value;
+}
+
+document.addEventListener("input", (ev) => {
+  const el = ev.target;
+  if (!el.dataset.bind) return;
+  const p = JSON.parse(el.dataset.bind);
+  setPath(state.data, p, parseValue(el));
+  // Keep the collapsed row summary in sync while typing.
+  if (p[0] === "roles" && ["label", "purpose", "target"].includes(p[2])) {
+    const row = $(`[data-role="${CSS.escape(p[1])}"] .role-row`), r = state.data.roles[p[1]];
+    if (row) {
+      row.querySelector(".role-name b").firstChild.textContent = roleName(p[1]);
+      row.querySelector(".role-purpose").textContent = r.purpose || "（未填写）";
+      row.querySelector(".role-model .m").textContent = modelSummary(r.target);
+    }
+  }
+  refresh();
+});
+
+document.addEventListener("change", (ev) => {
+  const el = ev.target, d = state.data, act = el.dataset.act;
+  if (act === "assign") return assign(el.value);
+  if (act === "t3-provider" || act === "t3-model" || act === "t3-opt") {
+    const t = getPath(d, JSON.parse(el.dataset.p));
+    if (!t.options || typeof t.options !== "object") t.options = {};
+    let dropped = [];
+    if (act === "t3-provider") {
+      t.provider = el.value;
+      const pv = provOf(t.provider);
+      if (pv && !pv.models.some((m) => m.slug === t.model)) {
+        // Model was cleared: the old model's options mean nothing for the new provider.
+        t.model = ""; dropped = Object.keys(t.options); t.options = {};
+      } else dropped = pruneOptions(t);
+    } else if (act === "t3-model") { t.model = el.value; dropped = pruneOptions(t); }
+    else {
+      const k = el.dataset.key;
+      if (el.value === "") delete t.options[k];
+      else t.options[k] = el.dataset.type === "boolean" ? el.value === "true" : el.value;
+    }
+    if (dropped.length) toast(`新模型不支持，已移除参数：${dropped.join("、")}`);
+    rerenderRoles(); renderFlow(); refresh();
+    return;
+  }
+  if (el.dataset.optkey !== undefined) {
+    const op = JSON.parse(el.dataset.optkey), opts = getPath(d, op);
+    const oldKey = el.dataset.old, newKey = el.value.trim();
+    if (newKey === oldKey) return;
+    if (!newKey || newKey in opts) { toast(!newKey ? "参数名不能为空" : `已经有参数 ${newKey} 了`, true); el.value = oldKey; return; }
+    const rebuilt = {}; for (const [k, v] of Object.entries(opts)) rebuilt[k === oldKey ? newKey : k] = v;
+    setPath(d, op, rebuilt); rerenderRoles(); return;
+  }
+  if (act === "step-toggle") {
+    const id = el.dataset.id; let s = stageOf(id);
+    if (!s) {
+      s = { id, enabled: true, required: false, roles: [] };
+      d.stages.push(s);
+      const order = STEPS.map((x) => x.id); d.stages.sort((a, b) => order.indexOf(a.id) - order.indexOf(b.id));
+    } else { s.enabled = el.checked; if (!el.checked) s.required = false; }
+    flowToggle = { id, on: el.checked };
+    renderFlow(); renderRoles(); refresh();
+    if (el.checked) signalFlowOn(id);
+  } else if (act === "step-required") { d.stages[Number(el.dataset.i)].required = el.checked; refresh(); }
+  else if (act === "step-assign" && el.value) {
+    const s = d.stages[Number(el.dataset.i)], order = Object.keys(d.roles);
+    s.roles = [...s.roles, el.value].sort((a, b) => order.indexOf(a) - order.indexOf(b));
+    justAddedChip = { step: Number(el.dataset.i), key: el.value };
+    renderFlow(); renderRoles(); refresh();
+  } else if (act === "effort") {
+    const p = JSON.parse(el.dataset.p);
+    const t = getPath(d, p);
+    if (!t.options || typeof t.options !== "object") t.options = {};
+    if (el.value === "") delete t.options[el.dataset.key]; else t.options[el.dataset.key] = el.value;
+    rerenderRoles(); renderFlow(); refresh();
+  }
+});
+
+function rerenderRoles() {
+  const openMore = $$(".role.open details.more").some((x) => x.open);
+  renderRoles();
+  if (openMore) $$(".role.open details.more").forEach((x) => (x.open = true));
+  refresh();
+}
+
+function askKey(message, current = "") {
+  const k = prompt(message, current)?.trim();
+  if (!k || k === current) return null;
+  if (!/^[a-z0-9][a-z0-9-]*$/.test(k)) { toast("只能用小写字母、数字和连字符，且不能以连字符开头", true); return null; }
+  if (k in state.data.roles) { toast(`已经有角色 ${k} 了`, true); return null; }
+  return k;
+}
+
+document.addEventListener("click", (ev) => {
+  const openBtn = ev.target.closest("[data-open]");
+  if (openBtn) { closeNav(); return openWorkflow(openBtn.dataset.open); }
+  const prBtn = ev.target.closest("[data-project]");
+  if (prBtn) { closeNav(); return openProject(prBtn.dataset.project); }
+  const b = ev.target.closest("button[data-act]");
+  if (!b) return;
+  const d = state.data, key = b.dataset.key, act = b.dataset.act;
+  if (act === "wf-new") return newWorkflow(b.dataset.from);
+  if (act === "t3-reload") {
+    const section = $("#sec-roles");
+    b.classList.add("is-loading");
+    b.setAttribute("aria-busy", "true");
+    section?.classList.add("is-syncing");
+    loadProviders().then(() => {
+      if (state.data) { rerenderRoles(); renderFlow(); refresh(); }
+      toast(t3On() ? "已重新读取 T3 的服务商和模型" : "仍然没读到 T3 的服务商列表", !t3On());
+    }).finally(() => {
+      b.classList.remove("is-loading");
+      b.removeAttribute("aria-busy");
+      section?.classList.remove("is-syncing");
+    });
+    return;
+  }
+  if (act === "wf-del") return deleteWorkflow();
+  if (act === "reload") { if (!dirty() || confirm("重新加载会丢掉还没保存的修改，继续吗？")) reopen(); return; }
+  if (act === "goto") return gotoIssue(state.issues[Number(b.dataset.i)]);
+  if (act === "goto-warn") return gotoIssue(state.warns[Number(b.dataset.i)]);
+  if (act === "role-toggle") {
+    const opening = state.openRole !== key;
+    justOpenedRole = opening ? key : null;
+    state.openRole = opening ? key : null;
+    renderRoles(); refresh();
+    return;
+  }
+  if (act === "role-add") {
+    const k = askKey("给新角色起一个内部键名（小写字母、数字、连字符），例如 tester");
+    if (!k) return;
+    d.roles[k] = { label: k, purpose: "", delegateRole: "general", access: "readonly", target: { provider: "", model: "", options: {} }, fallbacks: [] };
+    state.openRole = k;
+  } else if (act === "role-rename") {
+    const k = askKey("新的内部键名（小写字母、数字、连字符）", key);
+    if (!k) return;
+    const rebuilt = {}; for (const [x, v] of Object.entries(d.roles)) rebuilt[x === key ? k : x] = v;
+    d.roles = rebuilt;
+    for (const s of d.stages || []) s.roles = (s.roles || []).map((r) => (r === key ? k : r));
+    state.openRole = k;
+  } else if (act === "role-del") {
+    if (!confirm(`删除角色「${roleName(key)}」？它也会从所有步骤里移除。`)) return;
+    delete d.roles[key];
+    for (const s of d.stages || []) s.roles = (s.roles || []).filter((r) => r !== key);
+    state.openRole = null;
+  } else if (act === "step-unassign") {
+    const person = b.closest(".person");
+    if (person) {
+      const r = person.getBoundingClientRect();
+      const ghost = person.cloneNode(true);
+      ghost.classList.remove("is-new");
+      ghost.classList.add("chip-ghost");
+      ghost.setAttribute("aria-hidden", "true");
+      ghost.style.left = `${r.left}px`;
+      ghost.style.top = `${r.top}px`;
+      ghost.style.width = `${r.width}px`;
+      ghost.style.height = `${r.height}px`;
+      document.body.appendChild(ghost);
+      const removeGhost = () => ghost.remove();
+      ghost.addEventListener("animationend", removeGhost, { once: true });
+      setTimeout(removeGhost, 260);
+    }
+    const s = d.stages[Number(b.dataset.i)]; s.roles = s.roles.filter((r) => r !== key);
+  } else if (act === "fb-add") {
+    const main = d.roles[key].target || {};
+    d.roles[key].fallbacks.push({ provider: "", model: "", options: !t3On() && effortOf(main) ? { [effortOf(main).key]: "high" } : {} });
+  } else if (act === "fb-del") d.roles[key].fallbacks.splice(Number(b.dataset.i), 1);
+  else if (act === "fb-up") { const f = d.roles[key].fallbacks, i = Number(b.dataset.i); [f[i - 1], f[i]] = [f[i], f[i - 1]]; }
+  else if (act === "opt-add") {
+    const opts = getPath(d, JSON.parse(b.dataset.p));
+    // First added parameter defaults to an effort level, since that is what most roles need.
+    const hasEffort = Object.keys(opts).some((o) => o in EFFORT_KEYS);
+    let k = hasEffort ? "option" : "reasoningEffort";
+    for (let i = 2; k in opts; i++) k = `option${i}`;
+    opts[k] = hasEffort ? "" : "high";
+    return rerenderRoles(), renderFlow(), refresh();
+  } else if (act === "opt-del") { setPath(d, JSON.parse(b.dataset.p), undefined); return rerenderRoles(), renderFlow(), refresh(); }
+  else return;
+  renderFlow(); renderRoles(); refresh();
+  if (act === "role-add") $(`[data-role="${CSS.escape(state.openRole)}"]`)?.scrollIntoView({ behavior: scrollMode(), block: "start" });
+});
+
+$("#list").addEventListener("scroll", () => positionNavIndicator(false), { passive: true });
+$("#mobile-nav-toggle")?.addEventListener("click", toggleNav);
+$("#drawer-backdrop")?.addEventListener("click", closeNav);
+window.addEventListener("resize", () => {
+  positionNavIndicator(false);
+  if (window.innerWidth > 760) closeNav();
+  clearTimeout(flowResizeTimer);
+  flowResizeTimer = setTimeout(() => layoutFlowSignal(), 80);
+}, { passive: true });
+
+// Flow-card radial highlight follows the pointer, throttled to one paint per frame.
+{
+  let mxRaf = 0, mxStep = null, mxX = 0, mxY = 0;
+  const main = $("#main");
+  main.addEventListener("pointermove", (ev) => {
+    if (reduceMotion() || matchMedia("(hover: none)").matches) return;
+    const step = ev.target.closest?.(".step");
+    if (!step) return;
+    mxStep = step; mxX = ev.clientX; mxY = ev.clientY;
+    if (mxRaf) return;
+    mxRaf = requestAnimationFrame(() => {
+      mxRaf = 0;
+      if (!mxStep) return;
+      const r = mxStep.getBoundingClientRect();
+      mxStep.style.setProperty("--mx", `${mxX - r.left}px`);
+      mxStep.style.setProperty("--my", `${mxY - r.top}px`);
+    });
+  }, { passive: true });
+  main.addEventListener("pointerout", (ev) => {
+    const step = ev.target.closest?.(".step");
+    if (!step || (ev.relatedTarget && step.contains(ev.relatedTarget))) return;
+    step.style.removeProperty("--mx");
+    step.style.removeProperty("--my");
+    if (mxStep === step) mxStep = null;
+  }, { passive: true });
+}
+
+window.addEventListener("beforeunload", (e) => { if (dirty()) { e.preventDefault(); e.returnValue = ""; } });
+document.addEventListener("keydown", (e) => {
+  if (e.key === "Escape") closeNav();
+  if ((e.metaKey || e.ctrlKey) && e.key === "s") { e.preventDefault(); if (!$("#save")?.disabled) save(); }
+});
+
+$("#form-new").addEventListener("submit", (e) => {
+  if (e.submitter?.value !== "ok") return;
+  e.preventDefault(); createWorkflow(e.target);
+});
+await Promise.all([loadState(), loadProviders()]);
+await openWorkflow("default", true);
+booted = true;
+</script>
+</body>
+</html>
