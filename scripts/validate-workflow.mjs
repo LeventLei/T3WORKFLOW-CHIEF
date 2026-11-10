@@ -1,12 +1,11 @@
 #!/usr/bin/env node
-// Validate a Chief workflow config without third-party dependencies.
-// Usage: node scripts/validate-workflow.mjs <workflow.json> [...]
+// Validate a Chief scenes config (v2) without third-party dependencies.
+// Usage: node scripts/validate-workflow.mjs <config.json> [...]
 // Mirrors skills/chief-t3/workflows/workflow.schema.json plus the cross-field
-// rules the schema cannot express (stage roles must exist, reviewer differs).
+// rules the schema cannot express (references, review independence, escalation).
 // Browser-safe: the panel imports it directly; node:fs loads only for the CLI.
 
 const DELEGATE_ROLES = ["implementation", "research", "review", "design", "test", "general"];
-const STAGES = ["recon", "design", "implement", "review"];
 const KEY = /^[a-z0-9][a-z0-9-]*$/;
 
 const isObject = (v) => v !== null && typeof v === "object" && !Array.isArray(v);
@@ -14,6 +13,11 @@ const isInt = (v, min, max = Infinity) => Number.isInteger(v) && v >= min && v <
 
 /** Each issue: { path: (string|number)[], message: string } — path points at the offending field. */
 export function issues(cfg) {
+  if (!isObject(cfg)) return [{ path: [], message: "配置必须是 JSON 对象" }];
+  if (cfg.schemaVersion !== 2) {
+    return [{ path: ["schemaVersion"], message: "这是旧格式，请先运行转换（scripts/migrate-to-scenes.mjs）" }];
+  }
+
   const out = [];
   const add = (path, message) => out.push({ path, message });
   const only = (obj, allowed, path) => {
@@ -28,77 +32,101 @@ export function issues(cfg) {
     else if ("role" in t.options) add([...path, "options", "role"], "role 应放在派单顶层，不能写在模型参数里");
   };
 
-  if (!isObject(cfg)) return [{ path: [], message: "配置必须是 JSON 对象" }];
-  only(cfg, ["$schema", "schemaVersion", "name", "title", "description", "roles", "stages", "limits"], []);
-  if (cfg.schemaVersion !== 1) add(["schemaVersion"], "schemaVersion 必须是 1");
-  if (typeof cfg.name !== "string" || !KEY.test(cfg.name)) add(["name"], "名称只能用小写字母、数字和连字符");
+  only(cfg, ["$schema", "schemaVersion", "title", "scenes", "rules"], []);
   if ("title" in cfg && typeof cfg.title !== "string") add(["title"], "显示名称必须是文字");
-  if ("description" in cfg && typeof cfg.description !== "string") add(["description"], "描述必须是文字");
 
-  const roles = isObject(cfg.roles) ? cfg.roles : {};
-  if (!isObject(cfg.roles) || Object.keys(roles).length === 0) add(["roles"], "至少需要一个角色");
-  for (const [key, r] of Object.entries(roles)) {
-    const at = ["roles", key];
-    if (!KEY.test(key)) add(at, "角色键名只能用小写字母、数字和连字符");
-    if (!isObject(r)) { add(at, "必须是对象"); continue; }
-    only(r, ["label", "purpose", "delegateRole", "access", "reportLimit", "target", "fallbacks"], at);
-    if ("label" in r && typeof r.label !== "string") add([...at, "label"], "显示名必须是文字");
-    if (typeof r.purpose !== "string" || r.purpose.trim() === "") add([...at, "purpose"], "请写一句这个角色负责什么");
-    if (!DELEGATE_ROLES.includes(r.delegateRole)) add([...at, "delegateRole"], `任务类型必须是 ${DELEGATE_ROLES.join(" / ")} 之一`);
-    if (!["readonly", "write"].includes(r.access)) add([...at, "access"], "权限必须是只读或可写");
-    if ("reportLimit" in r && !isInt(r.reportLimit, 50)) add([...at, "reportLimit"], "汇报字数上限至少 50");
-    checkTarget(r.target, [...at, "target"]);
-    if (!Array.isArray(r.fallbacks)) add([...at, "fallbacks"], "备用模型必须是列表");
-    else r.fallbacks.forEach((f, i) => checkTarget(f, [...at, "fallbacks", i]));
+  const scenes = isObject(cfg.scenes) ? cfg.scenes : {};
+  if (!isObject(cfg.scenes) || Object.keys(scenes).length === 0) add(["scenes"], "至少需要一个场景");
+  for (const [key, s] of Object.entries(scenes)) {
+    const at = ["scenes", key];
+    if (!KEY.test(key)) add(at, "场景键名只能用小写字母、数字和连字符");
+    if (!isObject(s)) { add(at, "必须是对象"); continue; }
+    only(s, ["label", "when", "delegateRole", "access", "reportLimit", "primary", "backup", "fallback"], at);
+    if (typeof s.label !== "string" || s.label.trim() === "") add([...at, "label"], "请填写显示名");
+    if (typeof s.when !== "string" || s.when.trim() === "") add([...at, "when"], "请写一句什么时候用这个场景");
+    if (!DELEGATE_ROLES.includes(s.delegateRole)) add([...at, "delegateRole"], `任务类型必须是 ${DELEGATE_ROLES.join(" / ")} 之一`);
+    if (!["readonly", "write"].includes(s.access)) add([...at, "access"], "权限必须是只读或可写");
+    if ("reportLimit" in s && !isInt(s.reportLimit, 50)) add([...at, "reportLimit"], "汇报字数上限至少 50");
+    checkTarget(s.primary, [...at, "primary"]);
+    for (const slot of ["backup", "fallback"]) {
+      if (slot in s && s[slot] !== null) checkTarget(s[slot], [...at, slot]);
+    }
+  }
+  if (!Object.values(scenes).some((s) => isObject(s) && s.access === "write")) {
+    add(["scenes"], "至少需要一个可写（access: write）的场景");
   }
 
-  const stages = Array.isArray(cfg.stages) ? cfg.stages : [];
-  if (stages.length === 0) add(["stages"], "至少需要一个步骤");
-  const seen = new Set();
-  stages.forEach((s, i) => {
-    const at = ["stages", i];
-    if (!isObject(s)) return add(at, "必须是对象");
-    only(s, ["id", "enabled", "required", "roles", "note"], at);
-    if (!STAGES.includes(s.id)) add([...at, "id"], `步骤必须是 ${STAGES.join(" / ")} 之一`);
-    else if (seen.has(s.id)) add([...at, "id"], `步骤 "${s.id}" 重复了`);
-    seen.add(s.id);
-    for (const f of ["enabled", "required"]) if (typeof s[f] !== "boolean") add([...at, f], "必须是 true 或 false");
-    if (s.required === true && s.enabled === false) add([...at, "enabled"], "设为必经的步骤不能关闭");
-    if (!Array.isArray(s.roles) || s.roles.length === 0) add([...at, "roles"], "至少选一个负责的角色");
-    else for (const name of s.roles) if (!(name in roles)) add([...at, "roles"], `角色 "${name}" 不存在`);
-  });
-  if (!seen.has("implement")) add(["stages"], "必须有“实现”步骤");
-
-  const l = cfg.limits;
-  if (!isObject(l)) add(["limits"], "缺少规则设置");
+  const rules = cfg.rules;
+  if (!isObject(rules)) add(["rules"], "缺少规则设置");
   else {
-    only(l, ["maxParallelWriters", "maxReworkRounds", "contractFileThreshold"], ["limits"]);
-    if (!isInt(l.maxParallelWriters, 1, 8)) add(["limits", "maxParallelWriters"], "同时写代码的 Worker 数要在 1 到 8 之间");
-    if (!isInt(l.maxReworkRounds, 0, 5)) add(["limits", "maxReworkRounds"], "返工轮数要在 0 到 5 之间");
-    if (!isInt(l.contractFileThreshold, 0)) add(["limits", "contractFileThreshold"], "文件数阈值不能小于 0");
+    only(rules, [
+      "requireReview", "defaultWriteScene", "escalateTo", "escalateAfter",
+      "maxParallelWriters", "maxReworkRounds", "contractFileThreshold",
+    ], ["rules"]);
+    if (typeof rules.requireReview !== "boolean") add(["rules", "requireReview"], "必须是 true 或 false");
+    if (!isInt(rules.maxParallelWriters, 1, 8)) add(["rules", "maxParallelWriters"], "同时写代码的 Worker 数要在 1 到 8 之间");
+    if (!isInt(rules.maxReworkRounds, 0, 5)) add(["rules", "maxReworkRounds"], "返工轮数要在 0 到 5 之间");
+    if (!isInt(rules.contractFileThreshold, 0)) add(["rules", "contractFileThreshold"], "文件数阈值不能小于 0");
+
+    const implementations = Object.entries(scenes)
+      .filter(([, s]) => isObject(s) && s.delegateRole === "implementation")
+      .map(([key]) => key);
+    const pickScene = (field, label) => {
+      const value = rules[field];
+      if (value === undefined || value === null) return null;
+      if (typeof value !== "string" || !KEY.test(value)) {
+        add(["rules", field], `请选择一个${label}场景`);
+        return null;
+      }
+      if (!(value in scenes)) {
+        add(["rules", field], `${label}场景 "${value}" 不存在`);
+        return null;
+      }
+      if (!implementations.includes(value)) {
+        add(["rules", field], `${label}场景 "${value}" 不是 implementation 场景`);
+        return null;
+      }
+      if (scenes[value].access !== "write") {
+        add(["rules", field], `${label}场景 "${value}" 必须是可写（access: write）的场景`);
+        return null;
+      }
+      return value;
+    };
+    const defaultWrite = pickScene("defaultWriteScene", "默认写代码");
+    const escalate = pickScene("escalateTo", "升级");
+    if (defaultWrite && escalate && defaultWrite === escalate) {
+      add(["rules", "escalateTo"], "默认写代码场景和升级场景不能相同");
+    }
+    if ("escalateAfter" in rules) {
+      if (!isInt(rules.escalateAfter, 1, 5)) add(["rules", "escalateAfter"], "升级次数要在 1 到 5 之间");
+      else if (isInt(rules.maxReworkRounds, 0, 5) && rules.escalateAfter >= rules.maxReworkRounds) {
+        add(["rules", "escalateAfter"], "升级次数要小于返工轮数上限（升级后的场景至少还有一次机会）");
+      }
+      if (rules.escalateTo === undefined || rules.escalateTo === null) {
+        add(["rules", "escalateTo"], "填了升级次数就必须选择一个升级场景");
+      }
+    } else if (escalate) {
+      add(["rules", "escalateAfter"], "填了升级场景就必须填写失败次数");
+    }
+
+    if (rules.requireReview === true && !Object.values(scenes).some((s) => isObject(s) && s.delegateRole === "review")) {
+      add(["rules", "requireReview"], "打开独立审查时至少需要一个审查场景（delegateRole: review）");
+    }
   }
 
-  // Independent review: a review-stage model must never equal an implement-stage model.
-  const stageModels = (id) =>
-    (stages.find((s) => isObject(s) && s.id === id && s.enabled)?.roles ?? [])
-      .filter((k) => isObject(roles[k]) && isObject(roles[k].target))
-      .map((k) => [k, roles[k].target.model]);
-  for (const [rk, rm] of stageModels("review")) {
-    for (const [ik, im] of stageModels("implement")) {
-      if (rm === im) add(["roles", rk, "target", "model"], `审查角色 ${rk} 和实现角色 ${ik} 用了同一个模型（${rm}），审查必须换一个模型`);
+  // Independent review: a review scene's primary must never equal an implementation primary.
+  const primaryModels = (role) =>
+    Object.entries(scenes)
+      .filter(([, s]) => isObject(s) && s.delegateRole === role && isObject(s.primary))
+      .map(([key, s]) => [key, s.primary.model]);
+  for (const [rk, rm] of primaryModels("review")) {
+    for (const [ik, im] of primaryModels("implementation")) {
+      if (typeof rm === "string" && rm !== "" && rm === im) {
+        add(["scenes", rk, "primary", "model"], `审查场景 ${rk} 和实现场景 ${ik} 用了同一个模型（${rm}），审查必须换一个模型`);
+      }
     }
   }
   return out;
-}
-
-/**
- * A project's workflow.json may be a full config or a reference to a library
- * workflow: { "use": "<name>" }. Returns the library name for a reference, else null.
- */
-export function referencedWorkflow(cfg) {
-  if (!isObject(cfg) || !("use" in cfg)) return null;
-  const extra = Object.keys(cfg).filter((k) => k !== "use" && k !== "$schema");
-  return typeof cfg.use === "string" && KEY.test(cfg.use) && extra.length === 0 ? cfg.use : undefined;
 }
 
 export const formatPath = (path) =>

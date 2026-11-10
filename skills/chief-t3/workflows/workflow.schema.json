@@ -1,61 +1,71 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "https://github.com/ShawnWei0323/T3WORKFLOW-CHIEF/workflow.schema.json",
-  "title": "Chief workflow",
-  "description": "Chief 工作流的可编辑部分：角色到模型的映射、阶段开关与数量上限。等待、审查独立性、授权等硬规则在 SKILL.md 中，不可配置。",
+  "title": "Chief scenes config",
+  "description": "Chief 场景配置 v2：场景到模型的映射与规则。等待、审查独立性、授权等硬规则在 SKILL.md 中，不可配置。跨字段规则（引用、升级次数、审查模型不同）由 scripts/validate-workflow.mjs 校验。",
   "type": "object",
   "additionalProperties": false,
   "required": [
     "schemaVersion",
-    "name",
-    "roles",
-    "stages",
-    "limits"
+    "scenes",
+    "rules"
   ],
   "properties": {
     "$schema": {
       "type": "string"
     },
     "schemaVersion": {
-      "const": 1
-    },
-    "name": {
-      "type": "string",
-      "pattern": "^[a-z0-9][a-z0-9-]*$"
+      "const": 2
     },
     "title": {
       "type": "string",
       "description": "显示名称，可用中文"
     },
-    "description": {
-      "type": "string"
-    },
-    "roles": {
+    "scenes": {
       "type": "object",
       "minProperties": 1,
+      "description": "业务场景：每个场景写清楚什么时候用，并固定首选 / 备选 / 兜底三个模型位置",
       "propertyNames": {
         "pattern": "^[a-z0-9][a-z0-9-]*$"
       },
       "additionalProperties": {
-        "$ref": "#/$defs/role"
+        "$ref": "#/$defs/scene"
       }
     },
-    "stages": {
-      "type": "array",
-      "minItems": 1,
-      "items": {
-        "$ref": "#/$defs/stage"
-      }
-    },
-    "limits": {
+    "rules": {
       "type": "object",
       "additionalProperties": false,
       "required": [
+        "requireReview",
         "maxParallelWriters",
         "maxReworkRounds",
         "contractFileThreshold"
       ],
       "properties": {
+        "requireReview": {
+          "type": "boolean",
+          "description": "改了代码必须独立审查"
+        },
+        "defaultWriteScene": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "description": "写代码默认场景，必须指向 delegateRole: implementation 且 access: write 的场景；不指定时为空"
+        },
+        "escalateTo": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "description": "同一任务在默认场景失败 N 次后转给的场景，必须是可写的实现场景且与 defaultWriteScene 不同"
+        },
+        "escalateAfter": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 5,
+          "description": "失败几次后升级；必须小于 maxReworkRounds"
+        },
         "maxParallelWriters": {
           "type": "integer",
           "minimum": 1,
@@ -107,23 +117,26 @@
         }
       }
     },
-    "role": {
+    "scene": {
       "type": "object",
       "additionalProperties": false,
       "required": [
-        "purpose",
+        "label",
+        "when",
         "delegateRole",
         "access",
-        "target",
-        "fallbacks"
+        "primary"
       ],
       "properties": {
         "label": {
-          "type": "string"
-        },
-        "purpose": {
           "type": "string",
-          "minLength": 1
+          "minLength": 1,
+          "description": "显示名，可用中文"
+        },
+        "when": {
+          "type": "string",
+          "minLength": 1,
+          "description": "什么时候用这个场景，Chief 据此挑场景"
         },
         "delegateRole": {
           "enum": [
@@ -147,53 +160,31 @@
           "minimum": 50,
           "description": "汇报字数上限"
         },
-        "target": {
-          "$ref": "#/$defs/target"
+        "primary": {
+          "$ref": "#/$defs/target",
+          "description": "首选模型，必填"
         },
-        "fallbacks": {
-          "type": "array",
-          "description": "用户已明确授权的回退目标，按顺序尝试；列表之外不得替换",
-          "items": {
-            "$ref": "#/$defs/target"
-          }
-        }
-      }
-    },
-    "stage": {
-      "type": "object",
-      "additionalProperties": false,
-      "required": [
-        "id",
-        "enabled",
-        "required",
-        "roles"
-      ],
-      "properties": {
-        "id": {
-          "enum": [
-            "recon",
-            "design",
-            "implement",
-            "review"
+        "backup": {
+          "description": "备选模型，可空",
+          "oneOf": [
+            {
+              "$ref": "#/$defs/target"
+            },
+            {
+              "type": "null"
+            }
           ]
         },
-        "enabled": {
-          "type": "boolean"
-        },
-        "required": {
-          "type": "boolean",
-          "description": "true 时每个任务都必须经过该阶段"
-        },
-        "roles": {
-          "type": "array",
-          "minItems": 1,
-          "items": {
-            "type": "string"
-          },
-          "description": "可用于该阶段的角色键，必须存在于 roles"
-        },
-        "note": {
-          "type": "string"
+        "fallback": {
+          "description": "兜底模型，可空",
+          "oneOf": [
+            {
+              "$ref": "#/$defs/target"
+            },
+            {
+              "type": "null"
+            }
+          ]
         }
       }
     }

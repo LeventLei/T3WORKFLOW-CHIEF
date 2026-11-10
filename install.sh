@@ -196,4 +196,8 @@ if [[ -n $PROJECT ]]; then
   [[ -f $LEDGER/HANDOFF.md ]] || cp -- "$SKILL_SRC/templates/HANDOFF.md" "$LEDGER/HANDOFF.md"
   printf 'Project: %s\nLedger: %s\n' "$TARGET" "$LEDGER"
 fi
+CONFIG_FILE="${CHIEF_CONFIG:-$HOME/.chief-t3/config.json}"
+if [[ ! -e $CONFIG_FILE ]]; then
+  printf 'No global scenes config yet: %s\nSave once in the panel to create it; this script never overwrites an existing config.\n' "$CONFIG_FILE"
+fi
 printf 'Installation complete. Reload skills using your provider-supported method.\n'

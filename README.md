@@ -25,41 +25,55 @@ CHIEF_SKILL_DIR="$HOME/.agents/skills/chief-t3" bash install.sh
 | 文件 | 用途 |
 |---|---|
 | `skills/chief-t3/SKILL.md` | Chief 规则与工作流 |
-| `skills/chief-t3/workflows/` | 默认工作流配置与 JSON Schema，随 skill 安装 |
+| `skills/chief-t3/workflows/` | 出厂场景配置与 JSON Schema，随 skill 安装 |
 | `skills/chief-t3/templates/` | 权威模板，随 skill 安装；从 SKILL.md 所在目录相对解析 |
 | `templates/` | 仓库入口的兼容模板副本，与打包模板保持一致 |
 | `AGENTS.md` | 受管理的项目入口区块，区外保留用户规则 |
-| `panel/` | 本地工作流配置面板（`node panel/server.mjs`） |
+| `panel/` | 本地场景配置面板（`node panel/server.mjs`） |
 | `app/` | 把面板打包成 macOS 应用（`bash app/build-mac-app.sh`） |
-| `scripts/validate-workflow.mjs` | 工作流配置校验（命令行与面板共用） |
+| `scripts/validate-workflow.mjs` | 场景配置校验（命令行与面板共用） |
+| `scripts/migrate-to-scenes.mjs` | 旧配置转场景格式（v1 → v2），支持整机迁移 |
 | `install.sh` | 校验、备份、安装、集成项目规则与初始化缺失台账 |
 
 安装后的 skill 和模板独立可用，不需要原仓库仍在磁盘。项目台账为 `~/.t3-tasks/<project>/`，契约、报告、审查与输入用绝对路径传递。
 
 ## 工作流配置
 
-角色、模型和流程参数不再写死在文档里，而是放在 JSON 配置中：
+配置只有一份，全局共用，分两块：**场景**（什么时候用、用哪些模型）和**规则**（审查、并行、返工、契约阈值）。
 
 | 位置 | 用途 |
 |---|---|
-| `skills/chief-t3/workflows/default.json` | 默认工作流，随 skill 安装；重新安装会覆盖（覆盖前备份） |
-| `~/.chief-t3/workflows/<名称>.json` | 工作流库：你自己建的工作流，可被多个项目共用 |
-| `~/.t3-tasks/<project>/workflow.json` | 项目选择：完整配置（专属工作流），或一行引用 `{"use": "<名称>"}`；安装脚本不会创建或改动它 |
+| `~/.chief-t3/config.json` | 全局配置；在面板里保存后生成，下一次派单立即生效 |
+| `skills/chief-t3/workflows/default.json` | 出厂默认；没有全局配置时使用，随 skill 安装，重装不覆盖全局配置 |
 | `skills/chief-t3/workflows/workflow.schema.json` | 配置格式（JSON Schema），编辑器可据此补全和校验 |
 
-Chief 每个线程按顺序取第一个存在的配置：用户本次点名的文件或库中名称 → 项目 `workflow.json`（引用时读工作流库里的对应文件）→ 默认配置。`<project>` 是项目根目录的目录名。引用的工作流不存在或无效时 Chief 停止派单，不会悄悄回退到默认配置。
+路径可用 `CHIEF_CONFIG` 覆盖（测试用）。Chief 每个线程先看 `~/.chief-t3/config.json`，存在就用它，否则用技能目录的 `workflows/default.json`，并在首次汇报中说明用了哪个文件。用户在消息里临时提的要求（如“这次别派审查”）照常作为本次指令处理，不需要配置支持。
 
-可配置的内容：
+每个场景写清楚什么时候用，并固定三个模型位置：
 
-- `roles`：每个角色的 provider / model / `options`、`delegate_task` 顶层 `role`、读写权限、汇报字数、已授权 fallback 列表。
-- `stages`：recon / design / implement / review 四个阶段的开关、是否必经、可用角色。
-- `limits`：并行写 Worker 上限、返工轮数上限、必须写契约的文件数阈值。
+- `scenes.<key>.primary` / `backup` / `fallback`：首选（必填）/ 备选 / 兜底（可空）；首选不可用时按顺序往后换。
+- `scenes.<key>.label` / `when`：显示名、什么时候用；Chief 据此按任务挑选、组合场景。
+- `scenes.<key>.delegateRole` / `access` / `reportLimit`：派单顶层 `role`、只读或可写、汇报字数上限。
 
-不可配置、始终生效的规则在 `SKILL.md`：等待不轮询、审查模型必须与实现模型不同、fallback 之外不换模型、各类操作授权边界等。关闭 review 阶段时，Chief 会在汇报中写明"本次未经独立审查"。
+规则：
+
+- `requireReview`：改了代码必须独立审查（默认开）；实际使用的审查模型必须与写代码的模型不同。
+- `defaultWriteScene` / `escalateTo` / `escalateAfter`：写代码默认场景、失败 N 次后转给哪个场景；两者都必须是可写的实现场景，N 必须小于返工轮数上限。
+- `maxParallelWriters` / `maxReworkRounds` / `contractFileThreshold`：并行写 Worker 上限、返工轮数上限、必须写契约的文件数阈值。
+
+不可配置、始终生效的规则在 `SKILL.md`：等待不轮询、审查模型必须与实现模型不同、场景之外不换模型、各类操作授权边界等。关闭独立审查时，Chief 会在汇报中写明“本次未经独立审查”。
+
+旧格式一次性迁移：
+
+```bash
+node scripts/migrate-to-scenes.mjs --apply
+```
+
+`--apply` 以 `skills/chief-t3/workflows/default.json` 为源写 `~/.chief-t3/config.json`（已存在先备份），把 `~/.t3-tasks/*/workflow.json` 逐个改名为 `workflow.json.bak.<时间>` 并打印与全局配置的模型差异；`~/.chief-t3/workflows/` 原样保留。单份转换用 `node scripts/migrate-to-scenes.mjs <v1.json> [--out <file>]`，`--from` 可指定源。迁移前建议先备份；想先看效果，用临时 HOME 跑：`HOME=$(mktemp -d) node scripts/migrate-to-scenes.mjs --apply`（`CHIEF_CONFIG` 只改全局配置路径，不会阻止 `~/.t3-tasks/*/workflow.json` 被改名）。`--apply` 是一次性动作；重跑会用出厂默认替换 `~/.chief-t3/config.json`（先备份为 `config.json.bak.<时间>`），面板里的自定义修改请从备份恢复或手动合并。
 
 ### 配置面板
 
-本地网页编辑器，无第三方依赖。两种启动方式：
+本地网页编辑器，无第三方依赖，只有一页。两种启动方式：
 
 ```bash
 node panel/server.mjs            # 默认 http://127.0.0.1:4317，可加 --port 指定端口
@@ -73,16 +87,16 @@ bash app/build-mac-app.sh        # 生成 ~/Applications/Chief 工作流.app，�
 
 双击「Chief 工作流」会在后台启动面板并用默认浏览器打开；已经在运行时只打开页面。在 Dock 里退出应用会停止它启动的面板。日志在 `~/Library/Logs/chief-panel.log`。应用记录的是生成时的仓库路径和 node 路径，移动仓库或换了 node 安装位置后重新运行一次构建脚本即可；仓库里的代码更新不需要重新构建。
 
-- 左侧上半部分是**工作流**：内置的默认工作流和你自己建的工作流。「＋ 新建工作流」复制一个现有工作流，起名后即可修改；工作流页面可以「复制一份」或删除（还有项目在用时不能删，删除只是改名保留）。
-- 左侧下半部分是 **T3 项目**，直接读取 T3 Code 的项目列表（`~/.t3/userdata/statev2.sqlite`，只读；已删除的项目不显示，已归档的单独列出）。只存在于 `~/.t3-tasks/` 而 T3 里没有的项目标为「不在 T3」。
-- 点一个项目，选择它用哪个工作流：默认 / 库里的某个工作流 / 专属工作流（复制一份只给它用，直接在下方修改）。选中即生效。
-- 一页分三块：**① 流程**（四个步骤的开关、是否必经、由哪些角色负责）、**② 角色与模型**（点开一行改模型、强度和备用模型，不常用的设置收在“更多设置”）、**③ 规则**（三个数字）。内部名称、文件位置和 JSON 原文在页面底部“高级”里。
+- 顶栏是「Chief 场景配置」，右边是保存 / 撤销修改；保存后下一次派单立即生效。
+- **场景**：收起时一行显示显示名、什么时候用、首选模型、只读 / 可写和备用数量；点开可改显示名、键名、什么时候用、权限、任务类型、汇报字数，以及首选 / 备选 / 兜底三个模型位置（服务商、模型、推理参数；备选和兜底可清空）。底部「添加场景」新建并直接展开；每行可删除（二次确认）。删场景或改键名时，规则里的默认写场景 / 升级目标会同步清空或更新。
+- **规则**：审查开关；写代码默认用哪个场景；同一任务失败几次后转给哪个场景（下拉只列可写的实现场景，另有“不指定 / 不升级”）；并行写 Worker、返工轮数、契约文件数阈值。
+- **高级**：显示名称、配置文件位置、从磁盘重新加载、直接编辑 JSON。还没有全局配置文件时页面显示的是出厂默认，保存后写到 `~/.chief-t3/config.json`（写入时去掉 `$schema`）。
 - **服务商和模型同步自 T3 Code**：读取 T3 的服务商缓存 `~/.t3/caches/<服务商>.json`（只读，只取服务商、模型和可调参数，不读账号、密钥和用量）。改模型时服务商、模型、推理强度等都是下拉选择，选项和 T3 里一致；未启用的服务商标为「未启用」。换模型后新模型不支持的参数会自动去掉。T3 里已经没有的服务商 / 模型 / 参数值会标黄提示，但不阻止保存（缓存可能比 T3 慢一步）。在 T3 里启用新服务商或更新模型后，点「重新读取」即可。读不到缓存时退回手动填写。
-- 校验与 `scripts/validate-workflow.mjs` 相同，问题会标在对应的输入框和步骤上，底部保存栏列出全部问题，点击可跳到出错处；有问题时不能保存。
+- 校验与 `scripts/validate-workflow.mjs` 相同，问题会标在对应字段和场景行上，底部保存栏列出全部问题，点击可跳到出错处；有问题时不能保存。
 - 保存前备份旧文件为 `*.bak.<时间>`；文件在面板外被改过时拒绝覆盖，需先重新加载。
-- 只监听 127.0.0.1，只能编辑上述三类文件，拒绝跨站请求。
-- 位置可用环境变量覆盖：`T3CODE_HOME`（T3 数据目录，默认 `~/.t3`）、`CHIEF_T3_DB`（T3 数据库文件）、`CHIEF_WORKFLOWS_DIR`（工作流库目录）。读取 T3 项目需要 Node 22.5+（内置 `node:sqlite`）或系统里有 `sqlite3` 命令；都没有时只显示台账目录里的项目。
-- 改默认工作流后需重新运行 `install.sh` 才会装到 skill 目录；工作流库和项目选择在下一个 Chief 线程开工时生效。
+- 只监听 127.0.0.1，只能编辑全局配置文件，拒绝跨站请求。
+- 位置可用环境变量覆盖：`CHIEF_CONFIG`（全局配置文件，默认 `~/.chief-t3/config.json`）、`T3CODE_HOME`（T3 数据目录，默认 `~/.t3`）。
+- 保存后下一次派单立即生效；重装技能不会覆盖 `~/.chief-t3/config.json`。
 
 ## T3 执行要点
 
