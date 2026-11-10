@@ -4,10 +4,10 @@ T3 Code 主线程的 Chief 工作流：拆单 → `delegate_task` → 独立审�
 
 ## 安装
 
-需要 Bash 与常用 coreutils / awk；Windows 使用 Git Bash。
+需要 Bash 与常用 coreutils / awk。macOS 自带的 Bash 3.2 和 BSD 工具即可；Windows 使用 Git Bash。
 
 ```bash
-cd /f/T3WORKFLOW-CHIEF
+cd ~/dsh/T3WORKFLOW-CHIEF                # Windows Git Bash 例：cd /f/T3WORKFLOW-CHIEF
 bash install.sh                          # 只安装 skill
 bash install.sh "/f/project with spaces" # 同时集成项目 AGENTS 和台账
 # 可指定 skill 安装目录；不要指向源码 skill 目录
@@ -25,28 +25,78 @@ CHIEF_SKILL_DIR="$HOME/.agents/skills/chief-t3" bash install.sh
 | 文件 | 用途 |
 |---|---|
 | `skills/chief-t3/SKILL.md` | Chief 规则与工作流 |
+| `skills/chief-t3/workflows/` | 出厂场景配置与 JSON Schema，随 skill 安装 |
 | `skills/chief-t3/templates/` | 权威模板，随 skill 安装；从 SKILL.md 所在目录相对解析 |
 | `templates/` | 仓库入口的兼容模板副本，与打包模板保持一致 |
 | `AGENTS.md` | 受管理的项目入口区块，区外保留用户规则 |
+| `panel/` | 本地场景配置面板（`node panel/server.mjs`） |
+| `app/` | 把面板打包成 macOS 应用（`bash app/build-mac-app.sh`） |
+| `scripts/validate-workflow.mjs` | 场景配置校验（命令行与面板共用） |
+| `scripts/migrate-to-scenes.mjs` | 旧配置转场景格式（v1 → v2），支持整机迁移 |
 | `install.sh` | 校验、备份、安装、集成项目规则与初始化缺失台账 |
 
 安装后的 skill 和模板独立可用，不需要原仓库仍在磁盘。项目台账为 `~/.t3-tasks/<project>/`，契约、报告、审查与输入用绝对路径传递。
 
-## 角色
+## 工作流配置
 
-每线程首次 `delegate_task` 前一次 `orchestrator_capabilities`；仅错误或用户指定 provider 变化后重查。使用返回的实例与准确模型 ID；延迟工具先尝试 / 搜索再认定缺失。设置写在 `target.options`，Worker `role` 是 `delegate_task` 顶层字段。
+配置只有一份，全局共用，分两块：**场景**（什么时候用、用哪些模型）和**规则**（审查、并行、返工、契约阈值）。
 
-| 角色 | provider / model / target.options | 用途 |
-|---|---|---|
-| chief | 当前线程 | 拆单、契约、验收 |
-| scout / fast-dev | `pi` / `opencode-go/deepseek-v4.1-flash` / `{"thinking":"high"}` | 摸底 / 小改动 |
-| navigator | 首选 `antigravity` / `gemini-3.8-flash-high`；已授权 fallback：`codex` / `gpt-6.1-sol` / `{"reasoningEffort":"high"}` | 大范围 / 视觉分析 |
-| dev | `codex` / `gpt-6.1-sol` / `{"reasoningEffort":"high"}` | 跨文件实现与验证 |
-| reviewer | `codex` / `gpt-6-astra` / `{"reasoningEffort":"xhigh"}` | 独立审查，必须与实现模型不同 |
-| architect | `codex` / `gpt-6-astra` / `{"reasoningEffort":"xhigh"}` | S 级架构方案 |
-| 文档工作 | `pi` / `opencode-go/deepseek-v4.1-flash` / `{"thinking":"low"}` | 文档整理 |
+| 位置 | 用途 |
+|---|---|
+| `~/.chief-t3/config.json` | 全局配置；在面板里保存后生成，下一次派单立即生效 |
+| `skills/chief-t3/workflows/default.json` | 出厂默认；没有全局配置时使用，随 skill 安装，重装不覆盖全局配置 |
+| `skills/chief-t3/workflows/workflow.schema.json` | 配置格式（JSON Schema），编辑器可据此补全和校验 |
 
-navigator 首选不可用（含缺失、空模型列表或调用错误）时，可以使用用户已明确授权的 **Codex Sol/high fallback**，先核对其可用性；fallback 也不可用则报告，请用户决定，不再换其他模型。其他角色目标不可用也不得擅自替换；不自动重启、不猜模型试派。浏览器只能用于用户当次请求的浏览器工作，不能作模型失败后的自动降级。
+路径可用 `CHIEF_CONFIG` 覆盖（测试用）。Chief 每个线程先看 `~/.chief-t3/config.json`，存在就用它，否则用技能目录的 `workflows/default.json`，并在首次汇报中说明用了哪个文件。用户在消息里临时提的要求（如“这次别派审查”）照常作为本次指令处理，不需要配置支持。
+
+每个场景写清楚什么时候用，并固定三个模型位置：
+
+- `scenes.<key>.primary` / `backup` / `fallback`：首选（必填）/ 备选 / 兜底（可空）；首选不可用时按顺序往后换。
+- `scenes.<key>.label` / `when`：显示名、什么时候用；Chief 据此按任务挑选、组合场景。
+- `scenes.<key>.delegateRole` / `access` / `reportLimit`：派单顶层 `role`、只读或可写、汇报字数上限。
+
+规则：
+
+- `requireReview`：改了代码必须独立审查（默认开）；实际使用的审查模型必须与写代码的模型不同。
+- `defaultWriteScene` / `escalateTo` / `escalateAfter`：写代码默认场景、失败 N 次后转给哪个场景；两者都必须是可写的实现场景，N 必须小于返工轮数上限。
+- `maxParallelWriters` / `maxReworkRounds` / `contractFileThreshold`：并行写 Worker 上限、返工轮数上限、必须写契约的文件数阈值。
+
+不可配置、始终生效的规则在 `SKILL.md`：等待不轮询、审查模型必须与实现模型不同、场景之外不换模型、各类操作授权边界等。关闭独立审查时，Chief 会在汇报中写明“本次未经独立审查”。
+
+旧格式一次性迁移：
+
+```bash
+node scripts/migrate-to-scenes.mjs --apply
+```
+
+`--apply` 以 `skills/chief-t3/workflows/default.json` 为源写 `~/.chief-t3/config.json`（已存在先备份），把 `~/.t3-tasks/*/workflow.json` 逐个改名为 `workflow.json.bak.<时间>` 并打印与全局配置的模型差异；`~/.chief-t3/workflows/` 原样保留。单份转换用 `node scripts/migrate-to-scenes.mjs <v1.json> [--out <file>]`，`--from` 可指定源。迁移前建议先备份；想先看效果，用临时 HOME 跑：`HOME=$(mktemp -d) node scripts/migrate-to-scenes.mjs --apply`（`CHIEF_CONFIG` 只改全局配置路径，不会阻止 `~/.t3-tasks/*/workflow.json` 被改名）。`--apply` 是一次性动作；重跑会用出厂默认替换 `~/.chief-t3/config.json`（先备份为 `config.json.bak.<时间>`），面板里的自定义修改请从备份恢复或手动合并。
+
+### 配置面板
+
+本地网页编辑器，无第三方依赖，只有一页。两种启动方式：
+
+```bash
+node panel/server.mjs            # 默认 http://127.0.0.1:4317，可加 --port 指定端口
+```
+
+macOS 可以打包成双击即用的应用：
+
+```bash
+bash app/build-mac-app.sh        # 生成 ~/Applications/Chief 工作流.app，可传入其他目录
+```
+
+双击「Chief 工作流」会在后台启动面板并用默认浏览器打开；已经在运行时只打开页面。在 Dock 里退出应用会停止它启动的面板。日志在 `~/Library/Logs/chief-panel.log`。应用记录的是生成时的仓库路径和 node 路径，移动仓库或换了 node 安装位置后重新运行一次构建脚本即可；仓库里的代码更新不需要重新构建。
+
+- 顶栏是「Chief 场景配置」，右边是保存 / 撤销修改；保存后下一次派单立即生效。
+- **场景**：收起时一行显示显示名、什么时候用、首选模型、只读 / 可写和备用数量；点开可改显示名、键名、什么时候用、权限、任务类型、汇报字数，以及首选 / 备选 / 兜底三个模型位置（服务商、模型、推理参数；备选和兜底可清空）。底部「添加场景」新建并直接展开；每行可删除（二次确认）。删场景或改键名时，规则里的默认写场景 / 升级目标会同步清空或更新。
+- **规则**：审查开关；写代码默认用哪个场景；同一任务失败几次后转给哪个场景（下拉只列可写的实现场景，另有“不指定 / 不升级”）；并行写 Worker、返工轮数、契约文件数阈值。
+- **高级**：显示名称、配置文件位置、从磁盘重新加载、直接编辑 JSON。还没有全局配置文件时页面显示的是出厂默认，保存后写到 `~/.chief-t3/config.json`（写入时去掉 `$schema`）。
+- **服务商和模型同步自 T3 Code**：读取 T3 的服务商缓存 `~/.t3/caches/<服务商>.json`（只读，只取服务商、模型和可调参数，不读账号、密钥和用量）。改模型时服务商、模型、推理强度等都是下拉选择，选项和 T3 里一致；未启用的服务商标为「未启用」。换模型后新模型不支持的参数会自动去掉。T3 里已经没有的服务商 / 模型 / 参数值会标黄提示，但不阻止保存（缓存可能比 T3 慢一步）。在 T3 里启用新服务商或更新模型后，点「重新读取」即可。读不到缓存时退回手动填写。
+- 校验与 `scripts/validate-workflow.mjs` 相同，问题会标在对应字段和场景行上，底部保存栏列出全部问题，点击可跳到出错处；有问题时不能保存。
+- 保存前备份旧文件为 `*.bak.<时间>`；文件在面板外被改过时拒绝覆盖，需先重新加载。
+- 只监听 127.0.0.1，只能编辑全局配置文件，拒绝跨站请求。
+- 位置可用环境变量覆盖：`CHIEF_CONFIG`（全局配置文件，默认 `~/.chief-t3/config.json`）、`T3CODE_HOME`（T3 数据目录，默认 `~/.t3`）。
+- 保存后下一次派单立即生效；重装技能不会覆盖 `~/.chief-t3/config.json`。
 
 ## T3 执行要点
 
@@ -62,6 +112,7 @@ navigator 首选不可用（含缺失、空模型列表或调用错误）时，�
 
 ```bash
 bash -n install.sh
+node scripts/validate-workflow.mjs skills/chief-t3/workflows/default.json
 ```
 
 安装回归在临时目录隔离 HOME 与 CHIEF_SKILL_DIR，覆盖已有文件和备份、无效参数零写入、空格路径、源目标冲突、自包含模板、重复安装与 AGENTS 用户内容保留；不需要真实派单或浏览器。

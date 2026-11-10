@@ -1,0 +1,141 @@
+{
+  "$schema": "./workflow.schema.json",
+  "schemaVersion": 2,
+  "title": "Chief 场景配置",
+  "scenes": {
+    "scout": {
+      "label": "小范围摸底",
+      "when": "小范围只读摸底、长日志摘要；规格或影响面不清时先摸底",
+      "delegateRole": "research",
+      "access": "readonly",
+      "reportLimit": 300,
+      "primary": {
+        "provider": "pi",
+        "model": "opencode-go/deepseek-v4.1-flash",
+        "options": {
+          "thinking": "high"
+        }
+      },
+      "backup": null,
+      "fallback": null
+    },
+    "navigator": {
+      "label": "大范围分析",
+      "when": "大范围索引或多模态分析；全库索引产出关键调用链与影响面摘要，细节写文件；规格或影响面不清时先摸底",
+      "delegateRole": "research",
+      "access": "readonly",
+      "reportLimit": 500,
+      "primary": {
+        "provider": "antigravity",
+        "model": "gemini-3.8-flash",
+        "options": {
+          "thinking_level": "high"
+        }
+      },
+      "backup": {
+        "provider": "codex",
+        "model": "gpt-6.1-sol",
+        "options": {
+          "reasoningEffort": "high"
+        }
+      },
+      "fallback": null
+    },
+    "fast-dev": {
+      "label": "小改动",
+      "when": "规格明确的小改动",
+      "delegateRole": "implementation",
+      "access": "write",
+      "primary": {
+        "provider": "opencode",
+        "model": "opencode-go/deepseek-v4.1-flash",
+        "options": {
+          "variant": "high"
+        }
+      },
+      "backup": null,
+      "fallback": null
+    },
+    "dev": {
+      "label": "复杂开发",
+      "when": "跨文件改动、疑难 bug，完成相关验证",
+      "delegateRole": "implementation",
+      "access": "write",
+      "primary": {
+        "provider": "opencode",
+        "model": "opencode-go/deepseek-v4.1-flash",
+        "options": {
+          "variant": "high"
+        }
+      },
+      "backup": null,
+      "fallback": null
+    },
+    "reviewer": {
+      "label": "独立审查",
+      "when": "独立审查，给出 PASS / REJECT",
+      "delegateRole": "review",
+      "access": "readonly",
+      "primary": {
+        "provider": "claudeAgent",
+        "model": "claude-opus-5-5",
+        "options": {
+          "effort": "medium"
+        }
+      },
+      "backup": null,
+      "fallback": null
+    },
+    "architect": {
+      "label": "架构设计",
+      "when": "仅 S 级架构任务，产出 SPEC 并按约定评审",
+      "delegateRole": "design",
+      "access": "write",
+      "primary": {
+        "provider": "claudeAgent",
+        "model": "claude-opus-5-5",
+        "options": {
+          "effort": "high"
+        }
+      },
+      "backup": {
+        "provider": "codex",
+        "model": "gpt-6-astra",
+        "options": {
+          "reasoningEffort": "high"
+        }
+      },
+      "fallback": null
+    },
+    "docs": {
+      "label": "文档",
+      "when": "文档整理",
+      "delegateRole": "general",
+      "access": "write",
+      "primary": {
+        "provider": "antigravity",
+        "model": "gemini-3.8-flash",
+        "options": {
+          "thinking_level": "low"
+        }
+      },
+      "backup": {
+        "provider": "pi",
+        "model": "opencode-go/glm-5.3-flash",
+        "options": {
+          "thinking": "low"
+        }
+      },
+      "fallback": null
+    }
+  },
+  "rules": {
+    "requireReview": true,
+    "maxParallelWriters": 8,
+    "maxReworkRounds": 3,
+    "contractFileThreshold": 2,
+    "defaultWriteScene": "fast-dev",
+    "escalateTo": "dev",
+    "escalateAfter": 2
+  }
+}
