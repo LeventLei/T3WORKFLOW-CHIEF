@@ -1,29 +1,30 @@
 #!/usr/bin/env node
-// Convert a Chief workflow config to the scenes format (v2), or migrate this machine.
-// Zero dependencies, same rules as scripts/validate-workflow.mjs.
+// Convert a Chief workflow config to the scene-sets format (v3), or migrate this machine.
+// Zero dependencies, rules shared with scripts/validate-workflow.mjs.
 //
 // Usage:
-//   node scripts/migrate-to-scenes.mjs <v1-or-v2.json> [--out <file>]
+//   node scripts/migrate-to-scenes.mjs <v1-or-v2-or-v3.json> [--out <file>]
 //   node scripts/migrate-to-scenes.mjs --apply [--from <file>] [--out <target>]
 //
 // --apply reads HOME from process.env.HOME and writes CHIEF_CONFIG (default
-// ~/.chief-t3/config.json); existing configs and project workflow.json files are
-// backed up, never deleted.
+// ~/.chief-t3/config.json); an existing config is backed up, never deleted.
+// Project ledgers (~/.t3-tasks) were migrated by the previous version and are
+// left untouched.
 
-import { copyFileSync, existsSync, mkdirSync, readdirSync, readFileSync, renameSync, unlinkSync, writeFileSync } from "node:fs";
+import { copyFileSync, existsSync, mkdirSync, readFileSync, renameSync, unlinkSync, writeFileSync } from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
-import { validate } from "./validate-workflow.mjs";
+import { upgradeV2, validate } from "./validate-workflow.mjs";
 
 const HERE = path.dirname(fileURLToPath(import.meta.url));
 const REPO_ROOT = path.resolve(HERE, "..");
 const DEFAULT_SOURCE = path.join(REPO_ROOT, "skills/chief-t3/workflows/default.json");
 const USAGE = [
   "用法：",
-  "  node scripts/migrate-to-scenes.mjs <v1-or-v2.json> [--out <file>]",
+  "  node scripts/migrate-to-scenes.mjs <v1-or-v2-or-v3.json> [--out <file>]",
   "  node scripts/migrate-to-scenes.mjs --apply [--from <file>] [--out <target>]",
   "",
-  "  --apply  迁移本机：写全局配置，备份 ~/.t3-tasks/*/workflow.json 并打印模型差异",
+  "  --apply  迁移本机：写全局配置（v3），已存在先备份；不动 ~/.t3-tasks",
   "  --from   指定源配置（默认仓库的 skills/chief-t3/workflows/default.json）",
   "  --out    转换时写到文件；--apply 时覆盖目标全局配置路径",
 ].join("\n");
@@ -117,6 +118,7 @@ function sceneFromRole(key, role, stages, quiet) {
   return scene;
 }
 
+/** v1 → v2 (single set), unchanged rules from the previous migration. */
 function fromV1(cfg, quiet = false) {
   const roles = isObject(cfg.roles) ? cfg.roles : {};
   const stages = Array.isArray(cfg.stages) ? cfg.stages : [];
@@ -146,75 +148,18 @@ function fromV1(cfg, quiet = false) {
   return out;
 }
 
+/** Any supported version → validated v3. */
 function convert(cfg, source, { quiet = false } = {}) {
   if (!isObject(cfg)) throw new Error(`${source}：配置必须是 JSON 对象`);
-  if (cfg.schemaVersion === 2) {
-    const problems = validate(cfg);
-    if (problems.length) throw new Error(`${source}：v2 配置无效\n${problems.map((p) => `  - ${p}`).join("\n")}`);
-    return cfg;
-  }
-  if (cfg.schemaVersion !== 1) {
-    throw new Error(`${source}：无法识别的配置版本（schemaVersion=${JSON.stringify(cfg.schemaVersion)}）`);
-  }
-  const converted = fromV1(cfg, quiet);
-  const problems = validate(converted);
-  if (problems.length) throw new Error(`${source}：转换结果无效\n${problems.map((p) => `  - ${p}`).join("\n")}`);
-  return converted;
-}
+  let out;
+  if (cfg.schemaVersion === 3) out = cfg;
+  else if (cfg.schemaVersion === 2) out = upgradeV2(cfg);
+  else if (cfg.schemaVersion === 1) out = upgradeV2(fromV1(cfg, quiet));
+  else throw new Error(`${source}：无法识别的配置版本（schemaVersion=${JSON.stringify(cfg.schemaVersion)}）`);
 
-function modelChain(scene) {
-  return [scene.primary, scene.backup, scene.fallback]
-    .map((t) => (isObject(t) ? `${t.provider}/${t.model}` : "—"))
-    .join(" → ");
-}
-
-function compareProject(file, globalCfg, home) {
-  let project;
-  try {
-    project = readJson(file);
-  } catch (e) {
-    console.log(`  无法解析，跳过比较：${e.message}`);
-    return;
-  }
-  if (isObject(project) && typeof project.use === "string") {
-    console.log(`  引用工作流 "${project.use}"，项目文件本身不含场景模型。`);
-    const library = path.join(home, ".chief-t3", "workflows", `${project.use}.json`);
-    if (!existsSync(library)) {
-      console.log(`  未找到库文件 ${library}，无法比较。`);
-      return;
-    }
-    try {
-      project = readJson(library);
-    } catch (e) {
-      console.log(`  库文件无法解析：${e.message}`);
-      return;
-    }
-  }
-  let projectCfg;
-  try {
-    projectCfg = convert(project, file, { quiet: true });
-  } catch (e) {
-    console.log(`  配置无效，跳过比较：${e.message.split("\n")[0]}`);
-    return;
-  }
-
-  const globalScenes = isObject(globalCfg.scenes) ? globalCfg.scenes : {};
-  const projectScenes = isObject(projectCfg.scenes) ? projectCfg.scenes : {};
-  let differences = 0;
-  for (const [key, scene] of Object.entries(projectScenes)) {
-    if (!isObject(scene)) continue;
-    const other = globalScenes[key];
-    if (!isObject(other)) {
-      console.log(`  - ${key}：仅项目有（${modelChain(scene)}）`);
-      differences += 1;
-    } else if (modelChain(scene) !== modelChain(other)) {
-      console.log(`  - ${key}：项目 ${modelChain(scene)} / 全局 ${modelChain(other)}`);
-      differences += 1;
-    }
-  }
-  const onlyGlobal = Object.keys(globalScenes).filter((key) => !(key in projectScenes));
-  if (onlyGlobal.length) console.log(`  - 全局另有场景项目没有：${onlyGlobal.join("、")}`);
-  if (differences === 0) console.log("  场景模型与全局一致。");
+  const problems = validate(out);
+  if (problems.length) throw new Error(`${source}：配置无效\n${problems.map((p) => `  - ${p}`).join("\n")}`);
+  return out;
 }
 
 function apply(opts) {
@@ -224,12 +169,11 @@ function apply(opts) {
   if (!existsSync(source)) fail(`找不到源配置：${source}`);
   const cfg = convert(readJson(source), source);
   const target = opts.out || process.env.CHIEF_CONFIG || path.join(home, ".chief-t3", "config.json");
-  const stamp = timestamp();
 
   mkdirSync(path.dirname(target), { recursive: true });
   let backup = null;
   if (existsSync(target)) {
-    backup = uniquePath(`${target}.bak.${stamp}`);
+    backup = uniquePath(`${target}.bak.${timestamp()}`);
     copyFileSync(target, backup);
   }
   atomicWrite(target, serialize(withoutSchema(cfg)));
@@ -238,28 +182,9 @@ function apply(opts) {
     console.log(`备份：${backup}`);
     console.log("注意：已有全局配置已被本次迁移结果替换；面板里的自定义修改请从备份恢复或手动合并。");
   }
-  console.log(`来源：${source}`);
-
-  const tasksDir = path.join(home, ".t3-tasks");
-  const projects = existsSync(tasksDir)
-    ? readdirSync(tasksDir, { withFileTypes: true }).filter((d) => d.isDirectory()).map((d) => d.name).sort()
-    : [];
-  let migrated = 0;
-  for (const name of projects) {
-    const file = path.join(tasksDir, name, "workflow.json");
-    if (!existsSync(file)) continue;
-    migrated += 1;
-    console.log(`\n项目 ${name}：`);
-    compareProject(file, cfg, home);
-    const backupPath = uniquePath(`${file}.bak.${stamp}`);
-    renameSync(file, backupPath);
-    console.log(`  已备份：${backupPath}`);
-  }
-  if (migrated === 0) console.log("\n没有需要迁移的项目配置。");
-
-  const library = path.join(home, ".chief-t3", "workflows");
-  if (existsSync(library)) console.log(`\n${library} 保留不动。`);
-  console.log(`\n完成：全局配置 1 份，项目配置备份 ${migrated} 份。`);
+  console.log(`来源：${source}（schemaVersion 3）`);
+  console.log(`场景配置套：${Object.keys(cfg.sets).join("、")}；默认：${cfg.defaultSet}`);
+  console.log("完成：~/.t3-tasks 与 ~/.chief-t3/workflows 未改动。");
 }
 
 function parseArgs(argv) {
