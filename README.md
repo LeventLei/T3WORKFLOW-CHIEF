@@ -30,7 +30,7 @@ CHIEF_SKILL_DIR="$HOME/.agents/skills/chief-t3" bash install.sh
 | `templates/` | 仓库入口的兼容模板副本，与打包模板保持一致 |
 | `AGENTS.md` | 受管理的项目入口区块，区外保留用户规则 |
 | `panel/` | 本地场景配置面板（`node panel/server.mjs`）：多套场景 + 项目分配 |
-| `app/` | 把面板打包成 macOS 应用（`bash app/build-mac-app.sh`） |
+| `app/` | 面板启动器：macOS 打包成应用（`bash app/build-mac-app.sh`），Windows 生成桌面快捷方式（`powershell -File app/build-windows-shortcut.ps1`） |
 | `scripts/validate-workflow.mjs` | 场景配置校验（命令行与面板共用） |
 | `scripts/migrate-to-scenes.mjs` | 旧配置转场景格式（v1 → v2 → v3），支持整机迁移 |
 | `install.sh` | 校验、备份、安装、集成项目规则与初始化缺失台账 |
@@ -73,7 +73,7 @@ node scripts/migrate-to-scenes.mjs --apply
 
 ### 配置面板
 
-本地网页编辑器，无第三方依赖，只有一页。两种启动方式：
+本地网页编辑器，无第三方依赖，只有一页。启动方式：
 
 ```bash
 node panel/server.mjs            # 默认 http://127.0.0.1:4317，可加 --port 指定端口
@@ -101,6 +101,17 @@ bash app/build-mac-app.sh        # 生成 ~/Applications/Chief 工作流.app，�
 - 只监听 127.0.0.1，只能编辑全局配置文件，拒绝跨站请求。
 - 位置可用环境变量覆盖：`CHIEF_CONFIG`（全局配置文件，默认 `~/.chief-t3/config.json`）、`T3CODE_HOME`（T3 数据目录，默认 `~/.t3`）、`CHIEF_T3_DB`（T3 数据库路径，测试用）。
 - 保存后下一次派单立即生效；重装技能不会覆盖 `~/.chief-t3/config.json`。
+
+Windows 用 PowerShell 生成桌面快捷方式（PowerShell 5.1+；node 需在 PATH 或常见安装位置，18+）：
+
+```powershell
+powershell -ExecutionPolicy Bypass -File app/build-windows-shortcut.ps1
+powershell -ExecutionPolicy Bypass -File app/build-windows-shortcut.ps1 -StartMenu -Port 4318   # 开始菜单 / 换端口
+```
+
+双击「Chief 配置面板」会在后台启动面板并用默认浏览器打开；已经在运行时只打开页面。日志在 `%USERPROFILE%\.chief-t3\panel.log`（错误在 `panel.log.err`）。快捷方式记录的是生成时的仓库路径和 node 路径，移动仓库或换了 node 安装位置后重新运行一次脚本即可；仓库里的代码更新不需要重新构建。也可以直接运行 `powershell -NoProfile -File app/start-panel.ps1`（加 `-NoBrowser` 只起服务）。
+
+面板和启动器都要用仓库里的 `panel/`、`scripts/`、`skills/`，所以仓库留在磁盘上即可、可放任意位置；装好的 skill 本身不依赖仓库。
 
 ## T3 执行要点
 
