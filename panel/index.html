@@ -102,7 +102,7 @@
   }
 
   /* ---------- shell ---------- */
-  .app { display: grid; grid-template-columns: minmax(0, 1fr); height: 100vh; height: 100dvh; }
+  .app { display: grid; grid-template-columns: 228px minmax(0, 1fr); height: 100vh; height: 100dvh; }
   .mobile-bar, .drawer-backdrop { display: none; }
   aside {
     background: var(--sidebar);
@@ -236,6 +236,110 @@
     white-space: nowrap;
     vertical-align: 1px;
   }
+
+  /* ---------- set title + more menu ---------- */
+  .set-title {
+    flex: 1;
+    min-width: 0;
+    height: 30px;
+    margin-left: -7px;
+    padding: 0 6px;
+    border: 1px solid transparent;
+    border-radius: 6px;
+    background: transparent;
+    font-size: 15px;
+    font-weight: 600;
+    letter-spacing: -.01em;
+  }
+  .set-title:hover { border-color: var(--border); }
+  .set-title:focus { border-color: var(--input); background: var(--control-bg); }
+  .more-menu { position: relative; flex: none; }
+  .more-menu > summary {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 28px;
+    height: 28px;
+    border: 1px solid transparent;
+    border-radius: 6px;
+    color: var(--muted-foreground);
+    list-style: none;
+    cursor: pointer;
+    transition: background-color 140ms ease, color 140ms ease;
+  }
+  .more-menu > summary::-webkit-details-marker { display: none; }
+  .more-menu > summary:hover { background: var(--accent); color: var(--foreground); }
+  .more-menu[open] > summary { background: var(--accent); color: var(--foreground); }
+  .menu {
+    position: absolute;
+    right: 0;
+    top: calc(100% + 6px);
+    z-index: 40;
+    display: flex;
+    flex-direction: column;
+    gap: 1px;
+    min-width: 150px;
+    padding: 4px;
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    background: var(--card);
+    box-shadow: 0 8px 24px rgb(0 0 0 / 12%);
+  }
+  .menu button {
+    display: flex;
+    align-items: center;
+    height: 30px;
+    padding: 0 8px;
+    border: 0;
+    border-radius: 5px;
+    background: none;
+    color: var(--foreground);
+    font-size: 12.5px;
+    text-align: left;
+    cursor: pointer;
+  }
+  .menu button:hover:not(:disabled) { background: var(--accent); }
+  .menu button.danger { color: var(--error); }
+  .menu button:disabled { opacity: .4; cursor: not-allowed; }
+
+  /* ---------- project assignment ---------- */
+  .proj-list { border: 1px solid var(--border); border-radius: 10px; background: var(--card); overflow: hidden; }
+  .proj-row {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) minmax(180px, 250px);
+    align-items: center;
+    gap: 12px;
+    padding: 10px 14px;
+  }
+  .proj-row + .proj-row { border-top: 1px solid var(--border); }
+  .proj-main { min-width: 0; }
+  .proj-main b { display: block; font-size: 13px; font-weight: 500; line-height: 1.35; }
+  .proj-path {
+    display: block;
+    margin-top: 1px;
+    overflow: hidden;
+    color: var(--muted-foreground);
+    font-family: var(--mono);
+    font-size: 11.5px;
+    line-height: 1.35;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+  .proj-row select { width: 100%; }
+  details.archived { margin-top: 12px; }
+  details.archived > summary {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    color: var(--muted-foreground);
+    font-size: 12.5px;
+    list-style: none;
+    cursor: pointer;
+  }
+  details.archived > summary::-webkit-details-marker { display: none; }
+  details.archived > summary svg { width: 14px; height: 14px; transition: transform 140ms ease; }
+  details.archived[open] > summary { margin-bottom: 8px; }
+  details.archived[open] > summary svg { transform: rotate(90deg); }
 
   /* ---------- main / sticky top bar ---------- */
   main { min-width: 0; overflow: auto; background: var(--background); }
@@ -1077,7 +1181,7 @@
     .flow-line, .flow-spark { display: none; }
   }
   @media (max-width: 760px) {
-    .app { grid-template-columns: minmax(0, 1fr); grid-template-rows: minmax(0, 1fr); height: 100vh; height: 100dvh; }
+    .app { grid-template-columns: minmax(0, 1fr); grid-template-rows: auto minmax(0, 1fr); height: 100vh; height: 100dvh; }
     .mobile-bar {
       display: flex;
       position: sticky;
@@ -1139,7 +1243,7 @@
     body.nav-open aside { transform: none; }
     aside header { height: 48px; flex: none; }
     .wf-list { max-height: none; }
-    main { overflow: visible; }
+    main { overflow: auto; }
     .topbar { top: 0; }
     .topbar-inner { gap: 8px; padding: 0 16px; }
     .topbar-actions { gap: 4px; }
@@ -1167,6 +1271,8 @@
     .sync-text { flex-basis: 100%; }
     .sync .btn { margin-left: auto; }
     .info-line svg { align-self: flex-start; margin-top: calc((1.55em - 14px) / 2); }
+    .proj-row { grid-template-columns: 1fr; gap: 6px; }
+    .set-title { font-size: 14px; }
     .savebar { padding: 8px 16px; }
     .page-intro { padding-bottom: 0; }
     .intro-meta { display: block; margin-left: 0; }
@@ -1193,10 +1299,34 @@
 </head>
 <body>
 <div class="app">
+  <div class="mobile-bar">
+    <div class="mobile-brand"><span class="mobile-brand-title">Chief 场景配置</span></div>
+    <button class="mobile-nav-btn" id="mobile-nav-toggle" type="button" aria-label="打开场景配置列表" aria-expanded="false">
+      <svg width="16" height="16" viewBox="0 0 16 16" fill="none" aria-hidden="true"><path d="M5.5 4h8M5.5 8h8M5.5 12h8" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/><circle cx="2.8" cy="4" r=".9" fill="currentColor"/><circle cx="2.8" cy="8" r=".9" fill="currentColor"/><circle cx="2.8" cy="12" r=".9" fill="currentColor"/></svg>
+    </button>
+  </div>
+  <aside class="sidebar">
+    <header class="brand"><h1>Chief 场景配置</h1></header>
+    <div class="nav-body">
+      <ul class="wf-list" id="list"></ul>
+      <span class="nav-indicator" id="nav-indicator" aria-hidden="true"></span>
+    </div>
+  </aside>
   <main id="main"><div class="page"><p class="lead">加载中…</p></div></main>
 </div>
+<div class="drawer-backdrop" id="drawer-backdrop" aria-hidden="true"></div>
 <datalist id="dl-provider"></datalist>
 <datalist id="dl-model"></datalist>
+<dialog id="dlg-new" aria-labelledby="dlg-new-title"><form method="dialog" id="form-new">
+  <h3 id="dlg-new-title" style="margin:0">新建场景配置</h3>
+  <div class="choices" style="grid-template-columns:1fr 1fr">
+    <label class="choice"><input type="radio" name="mode" value="blank" checked><span><b>空白</b><small>一个空场景，审查先关着</small></span></label>
+    <label class="choice"><input type="radio" name="mode" value="copy"><span><b>复制当前这套</b><small id="copy-src"></small></span></label>
+  </div>
+  <label class="field"><span>显示名称</span><input name="label" required placeholder="例如：视频"></label>
+  <label class="field"><span>键名（小写字母、数字、连字符）</span><input name="key" class="mono" required pattern="[a-z0-9][a-z0-9\-]*" placeholder="自动生成"></label>
+  <div style="display:flex;gap:8px;justify-content:flex-end"><button class="btn" value="cancel" formnovalidate>取消</button><button class="btn primary" value="ok">创建</button></div>
+</form></dialog>
 <div class="toast" id="toast" role="status" aria-live="polite"></div>
 
 <script type="module">
@@ -1215,12 +1345,12 @@ const NUM_RULES = [
   { key: "maxReworkRounds", before: "同一个问题返工", after: "轮还不通过，就停下来问我", min: 0, max: 5 },
   { key: "contractFileThreshold", before: "改动超过", after: "个文件时，先写任务契约再派单", min: 0, max: 99 },
 ];
-const KEY_RE = /^[a-z0-9][a-z0-9-]*$/;
 
-const state = { t3: null, warns: [], cur: null, data: null, saved: "", openScene: null, jsonDraft: null, issues: [] };
+const state = { t3: null, projects: null, warns: [], cur: null, data: null, saved: "", sel: null, openScene: null, jsonDraft: null, issues: [] };
 const reduceMotion = () => matchMedia("(prefers-reduced-motion: reduce)").matches;
 let booted = false;
 let pageEntered = false;
+let navHasPosition = false;
 let savebarHideTimer = 0;
 let savedUntil = 0;
 let savedResetTimer = 0;
@@ -1239,6 +1369,7 @@ const I = {
   trash: icon(`<path d="M3.25 4.5h9.5M6.25 4.5v-1c0-.414.336-.75.75-.75h2c.414 0 .75.336.75.75v1M4.9 4.5l.5 7.2c.03.43.386.8.818.8h3.564c.432 0 .788-.37.818-.8l.5-7.2" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>`),
   refresh: icon(`<path d="M13.1 6.1A5.35 5.35 0 1 0 13.3 10" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/><path d="M13.1 2.9v3.2H9.9" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>`),
   check: `<svg class="saved-check" width="16" height="16" viewBox="0 0 16 16" fill="none" aria-hidden="true"><path pathLength="20" d="M3.2 8.4l3.05 3.05L12.9 4.6" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg>`,
+  more: icon(`<circle cx="8" cy="3.4" r="1.1" fill="currentColor"/><circle cx="8" cy="8" r="1.1" fill="currentColor"/><circle cx="8" cy="12.6" r="1.1" fill="currentColor"/>`),
 };
 const esc = (v) => String(v ?? "").replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
 const isObject = (v) => v !== null && typeof v === "object" && !Array.isArray(v);
@@ -1261,15 +1392,53 @@ const fieldByPath = (path) => $$("[data-bind],[data-path]").find((el) => {
   const raw = el.dataset.bind || el.dataset.path;
   try { return samePath(JSON.parse(raw), path); } catch { return false; }
 });
+// The issue path index of a scene key ("scenes" may sit behind the sets.<key>. prefix).
+const sceneOf = (p) => {
+  const i = p.indexOf("scenes");
+  return i >= 0 && typeof p[i + 1] === "string" ? p[i + 1] : null;
+};
+
+function positionNavIndicator(animate = true) {
+  const ind = $("#nav-indicator"), list = $("#list");
+  if (!ind || !list) return;
+  const btn = list.querySelector('[aria-current="true"]');
+  if (!btn) { ind.classList.remove("is-visible"); navHasPosition = false; return; }
+  const nav = ind.parentElement, nr = nav.getBoundingClientRect(), br = btn.getBoundingClientRect();
+  const direct = !animate || !navHasPosition;
+  if (direct) ind.style.transition = "none";
+  ind.style.transform = `translateY(${br.top - nr.top}px)`;
+  ind.style.height = `${br.height}px`;
+  ind.style.left = `${br.left - nr.left}px`;
+  ind.style.width = `${br.width}px`;
+  if (direct) { void ind.offsetWidth; ind.style.transition = ""; }
+  ind.classList.add("is-visible");
+  navHasPosition = true;
+}
+
+function closeNav() {
+  document.body.classList.remove("nav-open");
+  $("#mobile-nav-toggle")?.setAttribute("aria-expanded", "false");
+}
+function toggleNav() {
+  const open = !document.body.classList.contains("nav-open");
+  document.body.classList.toggle("nav-open", open);
+  $("#mobile-nav-toggle")?.setAttribute("aria-expanded", String(open));
+}
 
 function playEntry() {
   if (pageEntered) return;
   pageEntered = true;
   if (reduceMotion()) return;
-  const main = $("#main");
+  const main = $("#main"), list = $("#list"), aside = $("aside");
   if (!main) return;
   main.classList.add("view-enter");
-  setTimeout(() => main.classList.remove("view-enter"), 900);
+  list?.classList.add("list-enter");
+  aside?.classList.add("entering");
+  setTimeout(() => {
+    main.classList.remove("view-enter");
+    list?.classList.remove("list-enter");
+    aside?.classList.remove("entering");
+  }, 900);
 }
 async function runViewTransition(update) {
   if (!booted || reduceMotion() || typeof document.startViewTransition !== "function") { update(); return; }
@@ -1303,9 +1472,20 @@ async function api(method, url, body) {
 }
 
 // ---------- helpers on data ----------
-const sceneEntries = () => Object.entries(state.data?.scenes || {});
-const sceneName = (k) => state.data?.scenes?.[k]?.label || k;
+const setKey = () => (typeof state.sel === "string" && state.sel.startsWith("set:") ? state.sel.slice(4) : null);
+const sp = (...p) => ["sets", setKey(), ...p];
+const setEntries = () => Object.entries(isObject(state.data?.sets) ? state.data.sets : {});
+const setData = () => (isObject(state.data?.sets) ? state.data.sets[setKey()] : null);
+const setLabel = (k) => state.data?.sets?.[k]?.label || k;
+const setSceneName = (setK, sceneK) => state.data?.sets?.[setK]?.scenes?.[sceneK]?.label || sceneK;
+const projectMap = () => (isObject(state.data?.projects) ? state.data.projects : {});
+const boundCount = (k) => Object.values(projectMap()).filter((v) => v === k).length;
+const sceneEntries = () => Object.entries(setData()?.scenes || {});
+const sceneName = (k) => setData()?.scenes?.[k]?.label || k;
+const scenesOf = () => { const s = setData(); return isObject(s.scenes) ? s.scenes : (s.scenes = {}); };
+const rulesOf = () => { const s = setData(); return isObject(s.rules) ? s.rules : (s.rules = {}); };
 const writableImplementations = () => sceneEntries().filter(([, s]) => isObject(s) && s.delegateRole === "implementation" && s.access === "write");
+const KEY_RE = /^[a-z0-9][a-z0-9-]*$/;
 function effortOf(t) {
   for (const key of Object.keys(EFFORT_KEYS)) if (t?.options && key in t.options) return { key, value: t.options[key] };
   return null;
@@ -1332,15 +1512,16 @@ function modelSummary(t) {
   return `${m?.name || t.model}${level ? ` · ${level}` : ""}`;
 }
 // Mismatches with T3's provider snapshot. Warnings only: the snapshot can lag behind T3.
-function t3Warnings(data) {
-  if (!t3On() || !isObject(data) || !isObject(data.scenes)) return [];
+function t3Warnings() {
+  const set = setData();
+  if (!t3On() || !isObject(set) || !isObject(set.scenes)) return [];
   const out = [];
-  for (const [k, s] of Object.entries(data.scenes)) {
+  for (const [k, s] of Object.entries(set.scenes)) {
     if (!isObject(s)) continue;
     const slots = [["primary", s.primary], ["backup", s.backup], ["fallback", s.fallback]];
     for (const [slot, t] of slots) {
       if (!isObject(t) || !t.provider) continue;
-      const path = ["scenes", k, slot], where = SLOT_NAMES[slot];
+      const path = ["sets", setKey(), "scenes", k, slot], where = SLOT_NAMES[slot];
       const pv = provOf(t.provider);
       if (!pv) { out.push({ path, message: `${where}：T3 里没有服务商 "${t.provider}"` }); continue; }
       if (!usable(pv)) out.push({ path, message: `${where}：服务商 ${pv.name} 在 T3 里${pv.enabled ? "还没就绪" : "没有启用"}` });
@@ -1381,12 +1562,21 @@ async function loadConfig() {
   state.saved = r.data === null ? "" : JSON.stringify(r.data);
   state.openScene = null; state.jsonDraft = null;
   savedUntil = 0; clearTimeout(savedResetTimer); dirtyWas = false;
+  const keys = setEntries().map(([k]) => k);
+  const current = setKey();
+  const pick = current && keys.includes(current) ? current
+    : isObject(r.data) && keys.includes(r.data.defaultSet) ? r.data.defaultSet : keys[0];
+  state.sel = pick ? `set:${pick}` : null;
+}
+async function loadProjects() {
+  try { state.projects = await api("GET", "/api/projects"); }
+  catch (e) { state.projects = { ok: false, error: e.message, projects: [] }; }
 }
 const leaveOk = () => !dirty() || confirm("有修改还没保存，确定离开吗？");
 async function reopen(force = false) {
   if (!force && !leaveOk()) return;
   try {
-    await loadConfig();
+    await Promise.all([loadConfig(), loadProjects()]);
     await runViewTransition(() => {
       render();
       const main = $("#main"); if (main) main.scrollTop = 0;
@@ -1399,14 +1589,13 @@ async function save() {
     const body = { data: state.data };
     if (state.cur?.exists) body.baseMtime = state.cur.mtime;
     const r = await api("PUT", "/api/config", body);
-    state.cur.exists = true; state.cur.mtime = r.mtime;
+    state.cur.exists = true; state.cur.mtime = r.mtime; state.cur.upgradedFrom = undefined;
     state.saved = JSON.stringify(state.data);
     savedUntil = Date.now() + 1200;
     clearTimeout(savedResetTimer);
-    $("#default-note")?.remove();
-    const stateNote = $("#config-state"); if (stateNote) stateNote.textContent = "";
-    const advNote = $("#advanced-note"); if (advNote) advNote.textContent = "保存前会备份旧文件为 *.bak.<时间>。";
-    refresh();
+    const advOpen = !!$("#sec-adv")?.open;
+    render();
+    if (advOpen && $("#sec-adv")) $("#sec-adv").open = true;
     savedResetTimer = setTimeout(() => { savedUntil = 0; refresh(); }, 1200);
     toast(r.backup ? "已保存（旧版本已自动备份）" : "已保存");
   } catch (e) {
@@ -1425,8 +1614,10 @@ const EDITOR = `<section class="block" id="sec-scenes"></section>
   <details class="advanced" id="sec-adv"></details>`;
 function mountEditor() {
   const providers = new Set(), models = new Set();
-  for (const s of Object.values(state.data.scenes || {})) {
-    for (const t of [s?.primary, s?.backup, s?.fallback]) { if (t?.provider) providers.add(t.provider); if (t?.model) models.add(t.model); }
+  for (const set of Object.values(state.data.sets || {})) {
+    for (const s of Object.values(set?.scenes || {})) {
+      for (const t of [s?.primary, s?.backup, s?.fallback]) { if (t?.provider) providers.add(t.provider); if (t?.model) models.add(t.model); }
+    }
   }
   $("#dl-provider").innerHTML = [...providers].map((v) => `<option value="${esc(v)}">`).join("");
   $("#dl-model").innerHTML = [...models].map((v) => `<option value="${esc(v)}">`).join("");
@@ -1437,26 +1628,129 @@ function brokenFile() {
     <p class="path">${esc(state.cur.file)}</p><p>${(state.cur.issues || []).map(esc).join("<br>")}</p>
     <p>请用文本编辑器修好后再点：</p><button class="btn" data-act="reload">重新加载</button></div>`;
 }
-function topbarHTML({ title, editable = false }) {
+function topbarHTML({ title = "", titleInput = "", tag = "", actions = "", editable = false }) {
   return `<header class="topbar"><div class="topbar-inner">
-    <div class="topbar-title"><h2>${title}</h2></div>
-    <div class="topbar-actions">${editable ? `<span class="topbar-sep" aria-hidden="true"></span><div class="save-actions" id="save-actions"></div>` : ""}</div>
+    <div class="topbar-title">${title ? `<h2>${title}</h2>` : ""}${titleInput}${tag ? `<span class="tag">${tag}</span>` : ""}</div>
+    <div class="topbar-actions">${actions}${editable ? `<span class="topbar-sep" aria-hidden="true"></span><div class="save-actions" id="save-actions"></div>` : ""}</div>
   </div></header>`;
 }
+
+// ---------- sidebar ----------
+function renderList() {
+  const list = $("#list");
+  if (!list) return;
+  if (!state.data || !isObject(state.data.sets)) {
+    list.innerHTML = `<li class="note bad">配置读不出来，先修好文件</li>`;
+    positionNavIndicator(false);
+    return;
+  }
+  const defKey = state.data.defaultSet;
+  const setItem = ([k, s]) => {
+    const n = boundCount(k), isDef = k === defKey;
+    return `<li><button class="wf-item" data-act="open-set" data-key="${esc(k)}" aria-current="${state.sel === `set:${k}`}">
+      <span class="dot ${isDef ? "none" : ""}"></span><span class="t">${esc(s.label || k)}${isDef ? `<span class="tag">默认</span>` : ""}<small>${n ? `${n} 个项目在用` : "没有项目在用"}</small></span></button></li>`;
+  };
+  const bound = Object.keys(projectMap()).length;
+  const projErr = !!state.projects && state.projects.ok === false;
+  list.innerHTML = `<li class="group">场景配置</li>${setEntries().map(setItem).join("")}
+    <li><button class="wf-item new-wf" data-act="set-new">${I.plus}<span class="t">新建</span></button></li>
+    <li class="group">项目</li>
+    <li><button class="wf-item" data-act="open-projects" aria-current="${state.sel === "projects"}">
+      <span class="dot ${projErr ? "bad" : bound ? "" : "none"}"></span><span class="t">项目<small>${projErr ? "没读到 T3 项目列表" : bound ? `${bound} 个项目单独绑定` : "都跟随默认"}</small></span></button></li>`;
+  $$("#list > li").forEach((li, i) => li.style.setProperty("--row-i", i));
+  positionNavIndicator(navHasPosition);
+}
+
 function render() {
   if (!pageEntered) requestAnimationFrame(playEntry);
-  const m = $("#main");
-  const c = state.cur;
+  const m = $("#main"), c = state.cur;
   if (!c) { m.innerHTML = ""; return; }
-  const file = c.file || "~/.chief-t3/config.json";
-  const top = topbarHTML({ title: "Chief 场景配置", editable: state.data !== null });
+  const top = topbarHTML({ title: "Chief 场景配置", editable: !!state.data && isObject(state.data.sets) });
+  if (state.data === null) {
+    const intro = `<div class="page-intro"><p class="info-line">${I.info}<span>配置文件：<span class="path">${esc(c.file)}</span></span></p></div>`;
+    m.innerHTML = `${top}<div class="page">${intro}${brokenFile()}</div>`;
+    renderList();
+    return;
+  }
+  if (!isObject(state.data.sets) || !setEntries().length) {
+    m.innerHTML = `${top}<div class="page"><div class="empty-state"><p><b>这份配置没有多套场景结构（sets）。</b></p>
+      <p class="path">${esc(c.file || "~/.chief-t3/config.json")}</p>
+      <p>v1 / v2 文件先跑一次 <code>node scripts/migrate-to-scenes.mjs --apply</code>，再用下面的按钮重新加载。</p>
+      <button class="btn" data-act="reload">重新加载</button></div></div>`;
+    renderList();
+    return;
+  }
+  const keys = setEntries().map(([k]) => k);
+  const cur = setKey();
+  // A raw-JSON edit or a deleted set can leave the selection dangling; fall back to a real one.
+  if (state.sel !== "projects" && (!cur || !keys.includes(cur))) {
+    const pick = keys.includes(state.data.defaultSet) ? state.data.defaultSet : keys[0];
+    state.sel = `set:${pick}`;
+  }
+  renderList();
+  if (state.sel === "projects") renderProjects();
+  else renderSet();
+}
+
+function renderSet() {
+  const m = $("#main"), c = state.cur, key = setKey(), set = setData();
+  if (!set) return;
+  const isDefault = key === state.data.defaultSet, bound = boundCount(key);
+  const actions = `<details class="more-menu" id="set-menu"><summary aria-label="更多操作" title="更多操作">${I.more}</summary>
+    <div class="menu">
+      <button data-act="set-dup">复制一份</button>
+      <button data-act="set-default" ${isDefault ? "disabled" : ""}>设为默认</button>
+      <button class="danger" data-act="set-del" ${isDefault ? "disabled" : ""}>删除</button>
+    </div></details>`;
+  const top = topbarHTML({
+    titleInput: `<input class="set-title" data-bind="${P(["sets", key, "label"])}" value="${esc(set.label)}" placeholder="${esc(key)}" aria-label="这套配置的显示名">`,
+    tag: isDefault ? "默认" : "",
+    actions,
+    editable: true,
+  });
   const intro = `<div class="page-intro">
-    <p class="intro-line">Chief 每次派单前会读这些场景，按任务挑选、组合。保存后下一次派单立即生效。${c.exists ? "" : `<span class="intro-meta" id="default-note">现在显示的是出厂默认，保存后会生成下面这个配置文件。</span>`}</p>
-    <p class="info-line">${I.info}<span>配置文件：<span class="path">${esc(file)}</span><span id="config-state">${c.exists ? "" : "（还不存在）"}</span></span></p>
+    <p class="intro-line">Chief 每次派单前会读这一套场景，按任务挑选、组合。保存后下一次派单立即生效。<span class="intro-meta">${bound ? `有 ${bound} 个项目绑定了这一套。` : "没有项目单独绑定这一套。"}</span></p>
+    <p class="info-line">${I.info}<span>配置文件：<span class="path">${esc(c.file || "~/.chief-t3/config.json")}</span><span id="config-state">${c.exists ? "" : "（还不存在）"}</span></span></p>
+    ${c.exists ? "" : `<p class="intro-meta" id="default-note">现在显示的是出厂默认，保存后会生成上面这个配置文件。</p>`}
+    ${c.upgradedFrom === 2 ? `<p class="notice" id="upgrade-note">这份文件还是旧格式（v2 单套），已按“开发”一套显示。保存后会转换成新的多套格式。</p>` : ""}
   </div>`;
-  if (state.data === null) { m.innerHTML = `${top}<div class="page">${intro}${brokenFile()}</div>`; return; }
   m.innerHTML = `${top}<div class="page">${intro}${EDITOR}</div><div class="savebar" id="savebar" hidden></div>`;
   mountEditor();
+}
+
+function renderProjects() {
+  const m = $("#main"), c = state.cur, pr = state.projects;
+  const defLabel = setLabel(state.data.defaultSet), bound = projectMap();
+  const list = pr?.projects || [];
+  const shown = new Set(list.map((p) => p.root));
+  const orphans = Object.keys(bound).filter((root) => !shown.has(root));
+  const row = (p) => {
+    const cur = bound[p.root];
+    const opts = setEntries().map(([k, s]) => `<option value="${esc(k)}" ${cur === k ? "selected" : ""}>${esc(s.label || k)}</option>`).join("");
+    const missing = cur && !(cur in state.data.sets) ? `<option value="${esc(cur)}" selected>${esc(cur)}（这套已不存在）</option>` : "";
+    return `<div class="proj-row"><div class="proj-main"><b>${esc(p.title)}</b><span class="proj-path">${esc(p.root)}</span></div>
+      <select data-project-root="${esc(p.root)}" aria-label="${esc(p.title)} 用哪一套场景配置">
+        <option value="" ${cur ? "" : "selected"}>跟随默认（当前：${esc(defLabel)}）</option>${opts}${missing}</select></div>`;
+  };
+  const sync = pr && pr.ok === false
+    ? `<p class="sync bad"><span class="sync-text">${I.alert}<span>没读到 T3 项目列表（${esc(pr.error || "未知原因")}）。修好 T3 数据后点右边的按钮重新读取。</span></span><button class="btn ghost small" data-act="projects-reload">${I.refresh}<span>重新读取</span></button></p>`
+    : `<p class="sync"><span class="sync-text">${I.info}<span>项目列表来自 T3 Code（只读）。改完点右上角保存才生效。</span></span><button class="btn ghost small" data-act="projects-reload">${I.refresh}<span>重新读取</span></button></p>`;
+  const active = list.filter((p) => !p.archived), archived = list.filter((p) => p.archived);
+  const body = pr && pr.ok === false
+    ? `<section class="block">${sync}</section>`
+    : `<section class="block">
+        <div class="block-title"><h3>项目</h3><span class="n">${active.length}</span></div>
+        ${sync}
+        <div class="proj-list">${active.map(row).join("") || `<div class="proj-row"><span class="who">T3 里还没有项目</span></div>`}</div>
+        ${archived.length ? `<details class="archived"><summary>${I.chevron}<span>已归档（${archived.length}）</span></summary><div class="proj-list">${archived.map(row).join("")}</div></details>` : ""}
+        ${orphans.length ? `<details class="archived"><summary>${I.chevron}<span>配置里有、T3 里没读到（${orphans.length}）</span></summary><div class="proj-list">${orphans.map((root) => row({ title: root.split("/").filter(Boolean).pop() || root, root, archived: false })).join("")}</div></details>` : ""}
+      </section>`;
+  const intro = `<div class="page-intro">
+    <p class="intro-line">每个项目选用一套场景配置；没选的跟随默认那套（当前：${esc(defLabel)}）。</p>
+    <p class="info-line">${I.info}<span>配置文件：<span class="path">${esc(c.file || "~/.chief-t3/config.json")}</span></span></p>
+  </div>`;
+  m.innerHTML = `${topbarHTML({ title: "项目", editable: true })}<div class="page">${intro}${body}</div><div class="savebar" id="savebar" hidden></div>`;
+  refresh();
 }
 
 function syncLine() {
@@ -1470,7 +1764,7 @@ function syncLine() {
 }
 
 function slotCard(k, slot, t) {
-  const p = ["scenes", k, slot];
+  const p = sp("scenes", k, slot);
   if (!t) {
     return `<div class="model-card" data-card="${P(p)}"><div class="head"><span class="grow">${SLOT_NAMES[slot]}</span></div>
       <p class="who" style="margin:0 0 8px">未设置${SLOT_NAMES[slot].replace("模型", "")}模型</p>
@@ -1480,7 +1774,7 @@ function slotCard(k, slot, t) {
 }
 
 function sceneRow(k, s, isJust) {
-  const open = state.openScene === k, p = ["scenes", k];
+  const open = state.openScene === k, p = sp("scenes", k);
   const primary = isObject(s.primary) ? s.primary : {};
   const spare = (s.backup ? 1 : 0) + (s.fallback ? 1 : 0);
   const access = s.access === "write" ? "可写" : "只读";
@@ -1547,7 +1841,8 @@ function renderScenes() {
 }
 
 function renderRules() {
-  const r = isObject(state.data.rules) ? state.data.rules : (state.data.rules = {});
+  const set = setData() || {};
+  const r = isObject(set.rules) ? set.rules : (set.rules = {});
   const impl = writableImplementations();
   const option = ([k, s], selected) => `<option value="${esc(k)}" ${k === selected ? "selected" : ""}>${esc(s.label || k)}（${esc(k)}）</option>`;
   const stale = (value, list) => value && !list.some(([k]) => k === value) ? `<option value="${esc(value)}" selected>${esc(value)}（无效）</option>` : "";
@@ -1558,21 +1853,21 @@ function renderRules() {
     <div class="block-title"><h3>规则</h3><span class="n">${NUM_RULES.length + 3} 条</span></div>
     <p class="block-desc">写代码默认场景与失败升级只作用于实现类派单；设计、摸底、审查仍按场景描述挑选。</p>
     <div class="rules">
-      <label class="rule"><span class="switch"><input type="checkbox" data-act="require-review" data-path="${P(["rules", "requireReview"])}" ${r.requireReview ? "checked" : ""} aria-label="改了代码必须独立审查"><span></span></span>改了代码必须独立审查</label>
+      <label class="rule"><span class="switch"><input type="checkbox" data-act="require-review" data-path="${P(sp("rules", "requireReview"))}" ${r.requireReview ? "checked" : ""} aria-label="改了代码必须独立审查"><span></span></span>改了代码必须独立审查</label>
       <label class="rule">写代码默认用
-        <select data-act="default-write-scene" data-path="${P(["rules", "defaultWriteScene"])}" aria-label="写代码默认场景" style="max-width:260px">
+        <select data-act="default-write-scene" data-path="${P(sp("rules", "defaultWriteScene"))}" aria-label="写代码默认场景" style="max-width:260px">
           <option value="" ${defValue ? "" : "selected"}>不指定</option>
           ${stale(defValue, impl)}${impl.map((x) => option(x, defValue)).join("")}
         </select>，不按“任务看起来复杂”自行改派</label>
       <label class="rule">同一任务失败
-        <input type="number" min="1" max="5" data-bind="${P(["rules", "escalateAfter"])}" data-type="int" value="${esc(r.escalateAfter ?? 2)}" ${escValue ? "" : "disabled"} aria-label="失败次数">
+        <input type="number" min="1" max="5" data-bind="${P(sp("rules", "escalateAfter"))}" data-type="int" value="${esc(r.escalateAfter ?? 2)}" ${escValue ? "" : "disabled"} aria-label="失败次数">
         次后转给
-        <select data-act="escalate-to" data-path="${P(["rules", "escalateTo"])}" aria-label="失败升级场景" style="max-width:260px">
+        <select data-act="escalate-to" data-path="${P(sp("rules", "escalateTo"))}" aria-label="失败升级场景" style="max-width:260px">
           <option value="" ${escValue ? "" : "selected"}>不升级</option>
           ${stale(escValue, escOptions)}${escOptions.map((x) => option(x, escValue)).join("")}
         </select></label>
       ${NUM_RULES.map((x) => `<label class="rule">${x.before}
-        <input type="number" min="${x.min}" max="${x.max}" data-bind="${P(["rules", x.key])}" data-type="int" value="${esc(r[x.key])}" aria-label="${x.before}…${x.after}">
+        <input type="number" min="${x.min}" max="${x.max}" data-bind="${P(sp("rules", x.key))}" data-type="int" value="${esc(r[x.key])}" aria-label="${x.before}…${x.after}">
         ${x.after}</label>`).join("")}
     </div>
     <ul class="fixed">
@@ -1684,7 +1979,7 @@ function optionsEditor(p, t) {
 function refresh() {
   if (!state.data) return;
   state.issues = findIssues(state.data);
-  state.warns = t3Warnings(state.data);
+  state.warns = t3Warnings();
   $$(".invalid").forEach((el) => el.classList.remove("invalid"));
   $$("[data-scene-badge]").forEach((b) => (b.hidden = true));
   $$("[data-scene-warn]").forEach((b) => (b.hidden = true));
@@ -1692,7 +1987,8 @@ function refresh() {
   $$(".model-card.warn").forEach((c) => c.classList.remove("warn"));
   const warnCount = {};
   for (const w of state.warns) {
-    warnCount[w.path[1]] = (warnCount[w.path[1]] || 0) + 1;
+    const sk = sceneOf(w.path);
+    if (sk) warnCount[sk] = (warnCount[sk] || 0) + 1;
     const card = $$(".model-card").find((c) => c.dataset.card === JSON.stringify(w.path));
     if (card) { card.classList.add("warn"); const box = card.querySelector("[data-card-warn]"); if (box) box.innerHTML += `<p class="warn-text">${I.alert}<span>${esc(w.message)}</span></p>`; }
   }
@@ -1703,9 +1999,10 @@ function refresh() {
   const sceneCount = {}, sceneMsgs = {};
   for (const is of state.issues) {
     fieldByPath(is.path)?.classList.add("invalid");
-    if (is.path[0] === "scenes" && is.path[1]) {
-      sceneCount[is.path[1]] = (sceneCount[is.path[1]] || 0) + 1;
-      (sceneMsgs[is.path[1]] ||= []).push(is.message);
+    const sk = sceneOf(is.path);
+    if (sk) {
+      sceneCount[sk] = (sceneCount[sk] || 0) + 1;
+      (sceneMsgs[sk] ||= []).push(is.message);
     }
   }
   for (const [k, n] of Object.entries(sceneCount)) {
@@ -1716,8 +2013,10 @@ function refresh() {
   }
 
   const d = dirty(), n = state.issues.length, pendingJson = state.jsonDraft !== null;
+  // A v2 file is shown as v3; saving is what converts it, so it counts as pending.
+  const pendingUpgrade = !!state.cur?.upgradedFrom;
   const changed = changedFields();
-  const showDirty = !!(d || n || pendingJson);
+  const showDirty = !!(d || n || pendingJson || pendingUpgrade);
   const pop = showDirty && !dirtyWas;
   dirtyWas = showDirty;
   const actions = $("#save-actions");
@@ -1728,7 +2027,7 @@ function refresh() {
         <button class="btn primary small is-saved" id="save" disabled>${I.check}<span>已保存</span></button>`
       : `${n || pendingJson ? `<span class="dirty-indicator${n ? " bad" : ""}${pop ? " pop" : ""}" title="${n ? `${n} 个问题需要修正` : "JSON 有改动还没应用"}">${n ? `${n} 个问题` : "JSON 未应用"}</span>` : ""}
         <button class="btn ghost small" id="revert" ${d ? "" : "disabled"}><span>撤销<span class="wide-label">修改</span></span></button>
-        <button class="btn primary small" id="save" ${d && !n && !pendingJson ? "" : "disabled"}>${d && !changed ? `<span class="save-dot"></span>` : ""}${changed ? `保存 · ${changed} 处` : "保存"}</button>`;
+        <button class="btn primary small" id="save" ${(d || pendingUpgrade) && !n && !pendingJson ? "" : "disabled"}>${d && !changed ? `<span class="save-dot"></span>` : ""}${changed ? `保存 · ${changed} 处` : "保存"}</button>`;
     $("#save").onclick = save;
     $("#revert").onclick = () => { if (confirm("放弃所有还没保存的修改？")) { state.data = JSON.parse(state.saved); state.jsonDraft = null; render(); } };
   }
@@ -1758,28 +2057,48 @@ function refresh() {
 }
 
 function describe(is) {
-  const [a, b] = is.path;
-  if (a === "scenes" && b) return `场景「${sceneName(b)}」：${is.message}`;
-  if (a === "rules") return `规则：${is.message}`;
+  const p = is.path;
+  if (p[0] === "sets" && p[1]) {
+    const name = setLabel(p[1]);
+    if (p[2] === "scenes" && p[3]) return `「${name}」场景「${setSceneName(p[1], p[3])}」：${is.message}`;
+    if (p[2] === "rules") return `「${name}」规则：${is.message}`;
+    return `「${name}」：${is.message}`;
+  }
+  if (p[0] === "projects") return `项目绑定「${p[1]}」：${is.message}`;
+  if (p[0] === "defaultSet") return `默认那一套：${is.message}`;
   return is.message;
 }
 function gotoIssue(is) {
-  const [a, b] = is.path;
+  const p = is.path;
+  // Issue paths carry the set key: switch to that set (or the project page) first.
+  if (p[0] === "sets" && p[1] && p[1] !== setKey()) {
+    state.sel = `set:${p[1]}`;
+    state.openScene = null;
+    render();
+  } else if (p[0] === "projects" && state.sel !== "projects") {
+    state.sel = "projects";
+    render();
+  }
+  const sk = sceneOf(p);
   let target;
-  if (a === "scenes" && b && state.data.scenes?.[b]) {
-    if (state.openScene !== b) {
-      state.openScene = b; justOpenedScene = b;
+  if (sk && setData()?.scenes?.[sk]) {
+    if (state.openScene !== sk) {
+      state.openScene = sk; justOpenedScene = sk;
       renderScenes();
     }
-    target = fieldByPath(is.path)
-      || $$(".model-card").find((c) => c.dataset.card === JSON.stringify(is.path))
-      || $(`[data-scene="${CSS.escape(b)}"]`);
+    target = fieldByPath(p)
+      || $$(".model-card").find((c) => c.dataset.card === JSON.stringify(p))
+      || $(`[data-scene="${CSS.escape(sk)}"]`);
     const more = target?.closest("details"); if (more) more.open = true;
-  } else if (a === "rules") {
-    target = fieldByPath(is.path) || $("#sec-rules");
+  } else if (p.includes("rules")) {
+    target = fieldByPath(p) || $("#sec-rules");
+  } else if (p[0] === "projects") {
+    target = $(`[data-project-root="${CSS.escape(p[1])}"]`) || $(".proj-list");
+  } else if (p[0] === "sets") {
+    target = fieldByPath(p) || $("#sec-adv");
   } else {
-    $("#sec-adv").open = true;
-    target = fieldByPath(is.path) || $("#sec-adv");
+    const adv = $("#sec-adv"); if (adv) adv.open = true;
+    target = fieldByPath(p) || adv;
   }
   if (!target) return;
   target.scrollIntoView({ behavior: scrollMode(), block: "center" });
@@ -1804,40 +2123,47 @@ document.addEventListener("input", (ev) => {
   if (!el.dataset.bind) return;
   const p = JSON.parse(el.dataset.bind);
   setPath(state.data, p, parseValue(el));
-  if (p[0] === "scenes" && ["label", "when"].includes(p[2])) {
-    const row = $(`[data-scene="${CSS.escape(p[1])}"] .role-row`), s = state.data.scenes[p[1]];
+  const sk = sceneOf(p), last = p[p.length - 1];
+  if (sk && (last === "label" || last === "when")) {
+    const row = $(`[data-scene="${CSS.escape(sk)}"] .role-row`), s = setData().scenes[sk];
     if (row) {
-      row.querySelector(".role-name b").firstChild.textContent = sceneName(p[1]);
+      row.querySelector(".role-name b").firstChild.textContent = sceneName(sk);
       row.querySelector(".role-purpose").textContent = s.when || "（未填写什么时候用）";
     }
   }
-  if (p[0] === "scenes" && (p[2] === "delegateRole" || p[2] === "access")) renderRules();
+  if (sk && (last === "delegateRole" || last === "access")) renderRules();
+  if (p[0] === "sets" && p.length === 3 && last === "label") renderList();
   refresh();
 });
-
 document.addEventListener("change", (ev) => {
   const el = ev.target, d = state.data, act = el.dataset.act;
-  if (act === "require-review") { d.rules.requireReview = el.checked; renderRules(); refresh(); return; }
+  if (el.dataset.projectRoot !== undefined) {
+    if (!isObject(d.projects)) d.projects = {};
+    if (el.value) d.projects[el.dataset.projectRoot] = el.value;
+    else delete d.projects[el.dataset.projectRoot];
+    renderList(); refresh(); return;
+  }
+  if (act === "require-review") { rulesOf().requireReview = el.checked; renderRules(); refresh(); return; }
   if (act === "default-write-scene") {
-    const v = el.value;
-    if (v) d.rules.defaultWriteScene = v; else delete d.rules.defaultWriteScene;
-    if (d.rules.escalateTo && d.rules.escalateTo === d.rules.defaultWriteScene) {
-      delete d.rules.escalateTo; delete d.rules.escalateAfter;
+    const r = rulesOf(), v = el.value;
+    if (v) r.defaultWriteScene = v; else delete r.defaultWriteScene;
+    if (r.escalateTo && r.escalateTo === r.defaultWriteScene) {
+      delete r.escalateTo; delete r.escalateAfter;
     }
     renderRules(); renderScenes(); return;
   }
   if (act === "escalate-to") {
-    const v = el.value;
-    if (!v) { delete d.rules.escalateTo; delete d.rules.escalateAfter; }
+    const r = rulesOf(), v = el.value;
+    if (!v) { delete r.escalateTo; delete r.escalateAfter; }
     else {
-      d.rules.escalateTo = v;
-      if (!Number.isInteger(d.rules.escalateAfter)) {
-        d.rules.escalateAfter = Math.max(1, Math.min(2, (Number.isInteger(d.rules.maxReworkRounds) ? d.rules.maxReworkRounds : 2) - 1));
+      r.escalateTo = v;
+      if (!Number.isInteger(r.escalateAfter)) {
+        r.escalateAfter = Math.max(1, Math.min(2, (Number.isInteger(r.maxReworkRounds) ? r.maxReworkRounds : 2) - 1));
       }
     }
     renderRules(); refresh(); return;
   }
-  if (el.dataset.sceneKey !== undefined) { renameScene(el.dataset.key, el.value); return; }
+  if (el.dataset.sceneKey !== undefined) { renameScene(el); return; }
   if (act === "t3-provider" || act === "t3-model" || act === "t3-opt") {
     const t = getPath(d, JSON.parse(el.dataset.p));
     if (!t) return;
@@ -1877,7 +2203,8 @@ document.addEventListener("change", (ev) => {
   if (el.dataset.bind) {
     const p = JSON.parse(el.dataset.bind);
     setPath(d, p, parseValue(el));
-    if (p[0] === "scenes" && (p[2] === "delegateRole" || p[2] === "access")) renderRules();
+    const sk = sceneOf(p), last = p[p.length - 1];
+    if (sk && (last === "delegateRole" || last === "access")) renderRules();
     refresh();
   }
 });
@@ -1888,25 +2215,165 @@ function rerenderScenes() {
   if (openMore) $$(".role.open details.more").forEach((x) => (x.open = true));
 }
 
-function renameScene(oldKey, raw) {
-  const k = String(raw || "").trim();
+// Focus bookkeeping for in-place key renames: remember the field path, find it again
+// after the block is rebuilt.
+function focusPathOf(el) {
+  const raw = el?.dataset?.bind || el?.dataset?.path;
+  if (!raw) return null;
+  try { return JSON.parse(raw); } catch { return null; }
+}
+function remapScenePath(p, oldKey, newKey) {
+  if (!p) return null;
+  const out = [...p];
+  const i = out.indexOf("scenes");
+  if (i >= 0 && out[i + 1] === oldKey) out[i + 1] = newKey;
+  return out;
+}
+function focusField(p) {
+  if (!p) return;
+  const el = fieldByPath(p);
+  if (!el) return;
+  el.focus({ preventScroll: true });
+  if (el.matches("input[type=text],input:not([type]),textarea") && typeof el.setSelectionRange === "function") {
+    const n = el.value.length;
+    try { el.setSelectionRange(n, n); } catch { /* some inputs reject it */ }
+  }
+}
+
+function renameScene(el) {
+  const oldKey = el.dataset.key, k = String(el.value || "").trim();
+  const scenes = setData().scenes || {};
   if (k === oldKey) return;
-  if (!KEY_RE.test(k)) { toast("键名只能用小写字母、数字和连字符，且不能以连字符开头", true); renderScenes(); return; }
-  if (k in state.data.scenes) { toast(`已经有场景 ${k} 了`, true); renderScenes(); return; }
+  const reject = (msg) => { toast(msg, true); el.value = oldKey; };
+  if (!KEY_RE.test(k)) return reject("键名只能用小写字母、数字和连字符，且不能以连字符开头");
+  if (k in scenes) return reject(`已经有场景 ${k} 了`);
   const rebuilt = {};
-  for (const [x, v] of Object.entries(state.data.scenes)) rebuilt[x === oldKey ? k : x] = v;
-  state.data.scenes = rebuilt;
-  const r = state.data.rules;
+  for (const [x, v] of Object.entries(scenes)) rebuilt[x === oldKey ? k : x] = v;
+  setData().scenes = rebuilt;
+  const r = rulesOf();
   if (r.defaultWriteScene === oldKey) r.defaultWriteScene = k;
   if (r.escalateTo === oldKey) r.escalateTo = k;
   state.openScene = k;
-  renderScenes(); renderRules();
+  // Re-render on the next tick: the click that blurred this input lands on the old
+  // DOM first, then we rebuild and hand focus (and the caret) back to that field.
+  setTimeout(() => {
+    const focused = focusPathOf(document.activeElement);
+    renderScenes(); renderRules(); refresh();
+    focusField(remapScenePath(focused, oldKey, k));
+  }, 0);
+}
+
+// ---------- sets ----------
+function slugify(s) {
+  const base = String(s || "").toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-+|-+$/g, "");
+  return KEY_RE.test(base) ? base : "set";
+}
+function freeKey(base) {
+  const sets = state.data.sets || {};
+  if (!(base in sets)) return base;
+  for (let i = 2; ; i += 1) if (!(`${base}-${i}` in sets)) return `${base}-${i}`;
+}
+function blankSet(label) {
+  return {
+    label,
+    scenes: {
+      "new-scene": {
+        label: "新场景", when: "", delegateRole: "implementation", access: "write",
+        primary: { provider: "", model: "", options: {} }, backup: null, fallback: null,
+      },
+    },
+    rules: { requireReview: false, maxParallelWriters: 8, maxReworkRounds: 3, contractFileThreshold: 2 },
+  };
+}
+function selectSet(k) {
+  state.sel = `set:${k}`;
+  state.openScene = null;
+  closeNav();
+  const menu = $("#set-menu"); if (menu) menu.open = false;
+  runViewTransition(() => {
+    render();
+    const main = $("#main"); if (main) main.scrollTop = 0;
+  });
+}
+let keyFollowsLabel = true;
+// On the project page there is no selected set: copy the default one instead.
+const copySourceKey = () => setKey() || (isObject(state.data?.sets) ? state.data.defaultSet in state.data.sets ? state.data.defaultSet : Object.keys(state.data.sets)[0] || null : null);
+function openNewDialog(copy) {
+  const dlg = $("#dlg-new"), form = $("#form-new");
+  const src = setLabel(copySourceKey());
+  form.reset();
+  keyFollowsLabel = true;
+  form.elements.label.value = copy ? `${src} 副本` : "";
+  form.elements.mode.value = copy ? "copy" : "blank";
+  $("#copy-src").textContent = `复制「${src}」的场景和规则`;
+  form.elements.key.value = freeKey(slugify(form.elements.label.value));
+  dlg.showModal();
+  form.elements.label.focus();
+}
+function createSet(form) {
+  const label = String(form.elements.label.value || "").trim();
+  const typed = String(form.elements.key.value || "").trim();
+  const key = freeKey(KEY_RE.test(typed) ? typed : slugify(label));
+  const srcKey = copySourceKey();
+  const copy = form.elements.mode.value === "copy" && srcKey && isObject(state.data.sets[srcKey]);
+  const set = copy ? JSON.parse(JSON.stringify(state.data.sets[srcKey])) : blankSet(label || key);
+  set.label = label || key;
+  state.data.sets[key] = set;
+  selectSet(key);
+}
+function projectTitle(root) {
+  const hit = (state.projects?.projects || []).find((p) => p.root === root);
+  return hit?.title || root;
+}
+function deleteSet(k) {
+  const d = state.data;
+  if (k === d.defaultSet) { toast("默认那一套不能删，先把别的套设为默认。", true); return; }
+  const bound = Object.keys(projectMap()).filter((root) => projectMap()[root] === k);
+  const msg = bound.length
+    ? `删除「${setLabel(k)}」？\n这些项目会改回默认那一套：\n${bound.map(projectTitle).join("\n")}`
+    : `删除「${setLabel(k)}」？`;
+  if (!confirm(msg)) return;
+  if (isObject(d.projects)) for (const root of bound) delete d.projects[root];
+  delete d.sets[k];
+  selectSet(d.defaultSet in d.sets ? d.defaultSet : Object.keys(d.sets)[0]);
 }
 
 document.addEventListener("click", (ev) => {
+  if (ev.target.closest("#mobile-nav-toggle")) { toggleNav(); return; }
+  if (ev.target.closest("#drawer-backdrop")) { closeNav(); return; }
   const b = ev.target.closest("button[data-act]");
-  if (!b) return;
+  if (!b) {
+    const menu = $("#set-menu");
+    if (menu?.open && !ev.target.closest("#set-menu")) menu.open = false;
+    return;
+  }
   const d = state.data, key = b.dataset.key, act = b.dataset.act;
+  const menu = $("#set-menu"); if (menu) menu.open = false;
+  if (act === "open-set") { if (key !== setKey() || state.sel !== `set:${key}`) selectSet(key); else closeNav(); return; }
+  if (act === "open-projects") {
+    closeNav();
+    if (state.sel === "projects") return;
+    state.sel = "projects";
+    runViewTransition(() => {
+      render();
+      const main = $("#main"); if (main) main.scrollTop = 0;
+    });
+    return;
+  }
+  if (act === "set-new") { openNewDialog(false); return; }
+  if (act === "set-dup") { openNewDialog(true); return; }
+  if (act === "set-default") { d.defaultSet = setKey(); render(); toast(`默认改成「${setLabel(setKey())}」`); return; }
+  if (act === "set-del") { deleteSet(setKey()); return; }
+  if (act === "projects-reload") {
+    b.classList.add("is-loading");
+    b.setAttribute("aria-busy", "true");
+    loadProjects().then(() => {
+      renderList();
+      if (state.sel === "projects") render();
+      toast(state.projects?.ok === false ? "仍然没读到 T3 项目列表" : "已重新读取项目列表", state.projects?.ok === false);
+    }).finally(() => { b.classList.remove("is-loading"); b.removeAttribute("aria-busy"); });
+    return;
+  }
   if (act === "t3-reload") {
     const section = $("#sec-scenes");
     b.classList.add("is-loading");
@@ -1933,8 +2400,7 @@ document.addEventListener("click", (ev) => {
     return;
   }
   if (act === "scene-add") {
-    if (!isObject(d.scenes)) d.scenes = {};
-    const scenes = d.scenes;
+    const scenes = scenesOf();
     let k = "new-scene";
     for (let i = 2; k in scenes; i += 1) k = `new-scene-${i}`;
     scenes[k] = {
@@ -1948,20 +2414,21 @@ document.addEventListener("click", (ev) => {
   }
   if (act === "scene-del") {
     if (!confirm(`删除场景「${sceneName(key)}」？规则里指向它的引用会一起清空。`)) return;
-    delete d.scenes[key];
-    if (d.rules.defaultWriteScene === key) delete d.rules.defaultWriteScene;
-    if (d.rules.escalateTo === key) { delete d.rules.escalateTo; delete d.rules.escalateAfter; }
+    delete scenesOf()[key];
+    const r = rulesOf();
+    if (r.defaultWriteScene === key) delete r.defaultWriteScene;
+    if (r.escalateTo === key) { delete r.escalateTo; delete r.escalateAfter; }
     if (state.openScene === key) state.openScene = null;
     renderScenes(); renderRules();
     return;
   }
   if (act === "slot-add") {
-    d.scenes[key][b.dataset.slot] = { provider: "", model: "", options: {} };
+    scenesOf()[key][b.dataset.slot] = { provider: "", model: "", options: {} };
     rerenderScenes(); renderRules();
     return;
   }
   if (act === "slot-clear") {
-    d.scenes[key][b.dataset.slot] = null;
+    scenesOf()[key][b.dataset.slot] = null;
     rerenderScenes(); renderRules();
     return;
   }
@@ -1980,13 +2447,27 @@ document.addEventListener("click", (ev) => {
   }
 });
 
+$("#form-new").addEventListener("input", (ev) => {
+  const form = ev.target.form;
+  if (ev.target.name === "label" && keyFollowsLabel) form.elements.key.value = freeKey(slugify(ev.target.value));
+  if (ev.target.name === "key") keyFollowsLabel = false;
+});
+$("#form-new").addEventListener("submit", (ev) => {
+  if (ev.submitter?.value !== "ok") return;
+  ev.preventDefault();
+  createSet(ev.target);
+  $("#dlg-new").close();
+});
+window.addEventListener("resize", () => positionNavIndicator(false));
+
 window.addEventListener("beforeunload", (e) => { if (dirty()) { e.preventDefault(); e.returnValue = ""; } });
 document.addEventListener("keydown", (e) => {
   if ((e.metaKey || e.ctrlKey) && e.key === "s") { e.preventDefault(); if (!$("#save")?.disabled) save(); }
 });
 
+$("#mobile-nav-toggle")?.setAttribute("aria-expanded", "false");
 try {
-  await Promise.all([loadConfig(), loadProviders()]);
+  await Promise.all([loadConfig(), loadProviders(), loadProjects()]);
   render();
   booted = true;
 } catch (e) {

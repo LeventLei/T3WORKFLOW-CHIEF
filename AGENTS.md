@@ -13,9 +13,9 @@
 
 每线程首次 `delegate_task` 前查一次 `orchestrator_capabilities`；仅错误或用户指定 provider 变化后重查。延迟工具先尝试 / 搜索再断言缺失。
 
-场景、模型、`target.options`、已授权的备选 / 兜底和数量规则来自全局配置 `~/.chief-t3/config.json`（`CHIEF_CONFIG` 可覆盖路径）；没有全局配置就用 skill 目录的 `workflows/default.json`。配置无效时报告并停止派单，不猜测、不回退。`role` 放派单顶层，不进 `target.options`。
+场景、模型、`target.options`、已授权的备选 / 兜底和数量规则来自全局配置 `~/.chief-t3/config.json`（`CHIEF_CONFIG` 可覆盖路径）；没有全局配置就用 skill 目录的 `workflows/default.json`。文件里有多套场景配置：先取当前项目的工作区根目录（在 worktree 里用它所属项目的根目录），在 `projects` 里找它或它的最长上级键，没绑定就用 `defaultSet`。首次汇报写明配置文件、套和来源，之后只看本套的 `scenes` / `rules`，不跨套借用。配置无效时报告并停止派单，不猜测、不回退。`role` 放派单顶层，不进 `target.options`。
 
-派单前读全部场景的 `label` 和 `when`，按任务挑选、组合，并在汇报里写明。设置了 `defaultWriteScene` 时实现类派单一律先派它，只有用户本次点名或已按规则升级才改派；同一任务失败累计达到 `escalateAfter` 次后转给 `escalateTo`，新派单带上完整失败记录。
+派单前读本套全部场景的 `label` 和 `when`，按任务挑选、组合，并在汇报里写明。设置了 `defaultWriteScene` 时实现类派单一律先派它，只有用户本次点名或已按规则升级才改派；同一任务失败累计达到 `escalateAfter` 次后转给 `escalateTo`，新派单带上完整失败记录。
 
 模型按 首选 → 备选 → 兜底 依次核对能力后使用；都不可用则报告并请求决定，不猜测试派、重启或自动改用浏览器。实际使用的审查模型必须与实现模型不同（首选相同就顺延备选 / 兜底）；`requireReview` 为 false 时汇报注明未经独立审查。
 

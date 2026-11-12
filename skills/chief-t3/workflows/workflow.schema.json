@@ -2,91 +2,134 @@
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "https://github.com/ShawnWei0323/T3WORKFLOW-CHIEF/workflow.schema.json",
   "title": "Chief scenes config",
-  "description": "Chief 场景配置 v2：场景到模型的映射与规则。等待、审查独立性、授权等硬规则在 SKILL.md 中，不可配置。跨字段规则（引用、升级次数、审查模型不同）由 scripts/validate-workflow.mjs 校验。",
+  "description": "Chief 场景配置 v3：多套场景配置，每个 T3 项目选用其中一套。等待、审查独立性、授权等硬规则在 SKILL.md 中，不可配置。跨字段规则（引用、升级次数、审查模型不同、项目绑定）由 scripts/validate-workflow.mjs 校验。",
   "type": "object",
   "additionalProperties": false,
   "required": [
     "schemaVersion",
-    "scenes",
-    "rules"
+    "defaultSet",
+    "sets"
   ],
   "properties": {
     "$schema": {
       "type": "string"
     },
     "schemaVersion": {
-      "const": 2
+      "const": 3
     },
     "title": {
       "type": "string",
       "description": "显示名称，可用中文"
     },
-    "scenes": {
+    "defaultSet": {
+      "type": "string",
+      "pattern": "^[a-z0-9][a-z0-9-]*$",
+      "description": "没有项目绑定时使用的一套，必须是 sets 的键名"
+    },
+    "sets": {
       "type": "object",
       "minProperties": 1,
-      "description": "业务场景：每个场景写清楚什么时候用，并固定首选 / 备选 / 兜底三个模型位置",
+      "description": "场景配置套：每套自带场景和规则，互不共用",
       "propertyNames": {
         "pattern": "^[a-z0-9][a-z0-9-]*$"
       },
       "additionalProperties": {
-        "$ref": "#/$defs/scene"
+        "$ref": "#/$defs/set"
       }
     },
-    "rules": {
+    "projects": {
       "type": "object",
-      "additionalProperties": false,
-      "required": [
-        "requireReview",
-        "maxParallelWriters",
-        "maxReworkRounds",
-        "contractFileThreshold"
-      ],
-      "properties": {
-        "requireReview": {
-          "type": "boolean",
-          "description": "改了代码必须独立审查"
-        },
-        "defaultWriteScene": {
-          "type": [
-            "string",
-            "null"
-          ],
-          "description": "写代码默认场景，必须指向 delegateRole: implementation 且 access: write 的场景；不指定时为空"
-        },
-        "escalateTo": {
-          "type": [
-            "string",
-            "null"
-          ],
-          "description": "同一任务在默认场景失败 N 次后转给的场景，必须是可写的实现场景且与 defaultWriteScene 不同"
-        },
-        "escalateAfter": {
-          "type": "integer",
-          "minimum": 1,
-          "maximum": 5,
-          "description": "失败几次后升级；必须小于 maxReworkRounds"
-        },
-        "maxParallelWriters": {
-          "type": "integer",
-          "minimum": 1,
-          "maximum": 8,
-          "description": "同时写代码的 Worker 上限"
-        },
-        "maxReworkRounds": {
-          "type": "integer",
-          "minimum": 0,
-          "maximum": 5,
-          "description": "同一问题返工轮数上限，超过后请用户决定"
-        },
-        "contractFileThreshold": {
-          "type": "integer",
-          "minimum": 0,
-          "description": "改动文件数超过此值时必须写契约"
-        }
+      "description": "T3 项目工作区根目录（绝对路径，去掉末尾斜杠）绑定到哪一套",
+      "propertyNames": {
+        "pattern": "^(/|[A-Za-z]:[\\\\/])"
+      },
+      "additionalProperties": {
+        "type": "string",
+        "description": "sets 的键名"
       }
     }
   },
   "$defs": {
+    "set": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "label",
+        "scenes",
+        "rules"
+      ],
+      "properties": {
+        "label": {
+          "type": "string",
+          "minLength": 1,
+          "description": "这套配置的显示名，如“开发”“视频”"
+        },
+        "scenes": {
+          "type": "object",
+          "minProperties": 1,
+          "description": "业务场景：每个场景写清楚什么时候用，并固定首选 / 备选 / 兜底三个模型位置",
+          "propertyNames": {
+            "pattern": "^[a-z0-9][a-z0-9-]*$"
+          },
+          "additionalProperties": {
+            "$ref": "#/$defs/scene"
+          }
+        },
+        "rules": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "requireReview",
+            "maxParallelWriters",
+            "maxReworkRounds",
+            "contractFileThreshold"
+          ],
+          "properties": {
+            "requireReview": {
+              "type": "boolean",
+              "description": "改了代码必须独立审查；为 true 时本套必须有审查场景"
+            },
+            "defaultWriteScene": {
+              "type": [
+                "string",
+                "null"
+              ],
+              "description": "写代码默认场景，必须指向本套里 delegateRole: implementation 且 access: write 的场景；不指定时为空"
+            },
+            "escalateTo": {
+              "type": [
+                "string",
+                "null"
+              ],
+              "description": "同一任务在默认场景失败 N 次后转给本套的哪个场景，必须是可写的实现场景且与 defaultWriteScene 不同"
+            },
+            "escalateAfter": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 5,
+              "description": "失败几次后升级；必须小于 maxReworkRounds"
+            },
+            "maxParallelWriters": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 8,
+              "description": "同时写代码的 Worker 上限"
+            },
+            "maxReworkRounds": {
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 5,
+              "description": "同一问题返工轮数上限，超过后请用户决定"
+            },
+            "contractFileThreshold": {
+              "type": "integer",
+              "minimum": 0,
+              "description": "改动文件数超过此值时必须写契约"
+            }
+          }
+        }
+      }
+    },
     "target": {
       "type": "object",
       "additionalProperties": false,

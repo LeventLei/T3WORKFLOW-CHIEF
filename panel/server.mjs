@@ -2,22 +2,27 @@
 // Local editor for the global Chief scenes config. No dependencies; binds to 127.0.0.1.
 // Usage: node panel/server.mjs [--port 4317]
 //
-// One file: CHIEF_CONFIG or ~/.chief-t3/config.json. Until it exists, the panel
-// shows the factory default in skills/chief-t3/workflows/default.json.
-// T3 provider data is read-only; only whitelisted fields leave readT3Providers.
+// One file: CHIEF_CONFIG or ~/.chief-t3/config.json, holding every scene set.
+// Until it exists, the panel shows the factory default in
+// skills/chief-t3/workflows/default.json. A v2 file is upgraded in memory for
+// display and written back as v3. T3 provider and project data are read-only;
+// only whitelisted fields leave readT3Providers / readT3Projects.
 import { createServer } from "node:http";
 import { readFile, writeFile, readdir, stat, rename, copyFile, mkdir } from "node:fs/promises";
 import { existsSync } from "node:fs";
+import { execFile } from "node:child_process";
+import { promisify } from "node:util";
 import { homedir } from "node:os";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
-import { validate } from "../scripts/validate-workflow.mjs";
+import { upgradeV2, validate } from "../scripts/validate-workflow.mjs";
 
 const PANEL_DIR = path.dirname(fileURLToPath(import.meta.url));
 const REPO_DIR = path.dirname(PANEL_DIR);
 const DEFAULT_FILE = path.join(REPO_DIR, "skills/chief-t3/workflows/default.json");
 const CONFIG_FILE = process.env.CHIEF_CONFIG || path.join(homedir(), ".chief-t3", "config.json");
 const T3_HOME = process.env.T3CODE_HOME || path.join(homedir(), ".t3");
+const T3_DB = process.env.CHIEF_T3_DB || path.join(T3_HOME, "userdata", "statev2.sqlite");
 const portArg = process.argv.indexOf("--port");
 const PORT = Number(portArg > 0 ? process.argv[portArg + 1] : process.env.CHIEF_PANEL_PORT || 4317);
 const HOST = "127.0.0.1";
@@ -30,6 +35,30 @@ const STATIC = {
 
 class HttpError extends Error {
   constructor(status, message, extra = {}) { super(message); this.status = status; this.extra = extra; }
+}
+
+// ---------- T3 projects (read-only) ----------
+// Whitelist: title / workspace_root / archived_at. Nothing else leaves here.
+const T3_QUERY = "SELECT title, workspace_root AS root, archived_at AS archivedAt FROM projection_projects WHERE deleted_at IS NULL ORDER BY COALESCE(pinned_at, '') DESC, updated_at DESC";
+
+async function readT3Projects() {
+  if (!existsSync(T3_DB)) return { ok: false, error: `没找到 T3 数据库：${T3_DB}`, rows: [] };
+  try {
+    // node:sqlite (Node 22.5+) prints an experimental warning; silence just that.
+    const listeners = process.listeners("warning");
+    process.removeAllListeners("warning");
+    const { DatabaseSync } = await import("node:sqlite");
+    listeners.forEach((l) => process.on("warning", l));
+    const db = new DatabaseSync(T3_DB, { readOnly: true });
+    try { return { ok: true, rows: db.prepare(T3_QUERY).all() }; } finally { db.close(); }
+  } catch (nodeErr) {
+    try {
+      const { stdout } = await promisify(execFile)("sqlite3", ["-readonly", "-json", T3_DB, T3_QUERY], { timeout: 5000 });
+      return { ok: true, rows: stdout.trim() ? JSON.parse(stdout) : [] };
+    } catch {
+      return { ok: false, error: `无法读取 T3 项目列表（需要 Node 22.5+ 或 sqlite3 命令）：${nodeErr.message}`, rows: [] };
+    }
+  }
 }
 
 // ---------- T3 providers (read-only) ----------
@@ -91,19 +120,16 @@ async function atomicWrite(file, value) {
 async function readConfig() {
   const exists = existsSync(CONFIG_FILE);
   const file = exists ? CONFIG_FILE : DEFAULT_FILE;
+  const mtime = exists ? (await stat(CONFIG_FILE)).mtimeMs : null;
   let parsed;
   try { parsed = await readJson(file); }
-  catch (e) { return { data: null, file: CONFIG_FILE, exists, mtime: null, issues: [`无法读取配置：${e.message}`] }; }
+  catch (e) { return { data: null, file: CONFIG_FILE, exists, mtime, issues: [`无法读取配置：${e.message}`] }; }
   const { data, parseError } = parsed;
-  let issues = validate(data);
-  if (parseError) issues = [`JSON 解析失败：${parseError}`];
-  return {
-    data: parseError ? null : data,
-    file: CONFIG_FILE,
-    exists,
-    mtime: exists ? (await stat(CONFIG_FILE)).mtimeMs : null,
-    issues,
-  };
+  if (parseError) return { data: null, file: CONFIG_FILE, exists, mtime, issues: [`JSON 解析失败：${parseError}`] };
+  // A v2 file is shown as v3; saving writes v3 and backs up the old file.
+  const upgradedFrom = data?.schemaVersion === 2 ? 2 : undefined;
+  const value = upgradedFrom ? upgradeV2(data) : data;
+  return { data: value, file: CONFIG_FILE, exists, mtime, issues: validate(value), ...(upgradedFrom ? { upgradedFrom } : {}) };
 }
 
 async function readBody(req) {
@@ -134,6 +160,21 @@ async function handleApi(req, url) {
   }
 
   if (route === "GET /api/providers") return readT3Providers();
+
+  if (route === "GET /api/projects") {
+    const t3 = await readT3Projects();
+    if (!t3.ok) return { ok: false, error: t3.error, projects: [] };
+    // T3's scratch workspace is not a real project.
+    const scratch = path.resolve(T3_HOME, "scratch");
+    const projects = t3.rows
+      .map((row) => ({
+        title: String(row.title || "").trim() || path.basename(String(row.root || "")) || "未命名项目",
+        root: String(row.root || "").replace(/[\\/]+$/, ""),
+        archived: row.archivedAt !== null && row.archivedAt !== undefined && row.archivedAt !== "",
+      }))
+      .filter((p) => p.root !== "" && path.resolve(p.root) !== scratch);
+    return { ok: true, projects };
+  }
 
   if (route === "GET /api/config") return readConfig();
 

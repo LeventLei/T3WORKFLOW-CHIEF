@@ -29,17 +29,17 @@ CHIEF_SKILL_DIR="$HOME/.agents/skills/chief-t3" bash install.sh
 | `skills/chief-t3/templates/` | 权威模板，随 skill 安装；从 SKILL.md 所在目录相对解析 |
 | `templates/` | 仓库入口的兼容模板副本，与打包模板保持一致 |
 | `AGENTS.md` | 受管理的项目入口区块，区外保留用户规则 |
-| `panel/` | 本地场景配置面板（`node panel/server.mjs`） |
+| `panel/` | 本地场景配置面板（`node panel/server.mjs`）：多套场景 + 项目分配 |
 | `app/` | 面板启动器：macOS 打包成应用（`bash app/build-mac-app.sh`），Windows 生成桌面快捷方式（`powershell -File app/build-windows-shortcut.ps1`） |
 | `scripts/validate-workflow.mjs` | 场景配置校验（命令行与面板共用） |
-| `scripts/migrate-to-scenes.mjs` | 旧配置转场景格式（v1 → v2），支持整机迁移 |
+| `scripts/migrate-to-scenes.mjs` | 旧配置转场景格式（v1 → v2 → v3），支持整机迁移 |
 | `install.sh` | 校验、备份、安装、集成项目规则与初始化缺失台账 |
 
 安装后的 skill 和模板独立可用，不需要原仓库仍在磁盘。项目台账为 `~/.t3-tasks/<project>/`，契约、报告、审查与输入用绝对路径传递。
 
 ## 工作流配置
 
-配置只有一份，全局共用，分两块：**场景**（什么时候用、用哪些模型）和**规则**（审查、并行、返工、契约阈值）。
+配置只有一个文件，里面可以有多套**场景配置**（`sets`）：每套自带**场景**（什么时候用、用哪些模型）和**规则**（审查、并行、返工、契约阈值）。`projects` 把 T3 项目的工作区根目录绑到某一套，没绑定的用 `defaultSet`。
 
 | 位置 | 用途 |
 |---|---|
@@ -47,18 +47,18 @@ CHIEF_SKILL_DIR="$HOME/.agents/skills/chief-t3" bash install.sh
 | `skills/chief-t3/workflows/default.json` | 出厂默认；没有全局配置时使用，随 skill 安装，重装不覆盖全局配置 |
 | `skills/chief-t3/workflows/workflow.schema.json` | 配置格式（JSON Schema），编辑器可据此补全和校验 |
 
-路径可用 `CHIEF_CONFIG` 覆盖（测试用）。Chief 每个线程先看 `~/.chief-t3/config.json`，存在就用它，否则用技能目录的 `workflows/default.json`，并在首次汇报中说明用了哪个文件。用户在消息里临时提的要求（如“这次别派审查”）照常作为本次指令处理，不需要配置支持。
+路径可用 `CHIEF_CONFIG` 覆盖（测试用）。Chief 每个线程先看 `~/.chief-t3/config.json`，存在就用它，否则用技能目录的 `workflows/default.json`。用哪一套：取当前 T3 项目的工作区根目录（线程在 worktree 里时用它所属项目的根目录），在 `projects` 里找这个路径；找不到再找一个是它上级目录的键，取最长的；都没有就用 `defaultSet`。之后挑场景、默认写代码场景、失败升级和审查规则都只看这一套的 `scenes` 和 `rules`，不跨套借用。用户在消息里临时提的要求（如“这次别派审查”）照常作为本次指令处理，不需要配置支持。
 
-每个场景写清楚什么时候用，并固定三个模型位置：
+每套内部的场景写清楚什么时候用，并固定三个模型位置：
 
-- `scenes.<key>.primary` / `backup` / `fallback`：首选（必填）/ 备选 / 兜底（可空）；首选不可用时按顺序往后换。
-- `scenes.<key>.label` / `when`：显示名、什么时候用；Chief 据此按任务挑选、组合场景。
-- `scenes.<key>.delegateRole` / `access` / `reportLimit`：派单顶层 `role`、只读或可写、汇报字数上限。
+- `sets.<套键>.scenes.<场景键>.primary` / `backup` / `fallback`：首选（必填）/ 备选 / 兜底（可空）；首选不可用时按顺序往后换。
+- `scenes.<场景键>.label` / `when`：显示名、什么时候用；Chief 据此按任务挑选、组合场景。
+- `scenes.<场景键>.delegateRole` / `access` / `reportLimit`：派单顶层 `role`、只读或可写、汇报字数上限。
 
-规则：
+每套自己的规则：
 
-- `requireReview`：改了代码必须独立审查（默认开）；实际使用的审查模型必须与写代码的模型不同。
-- `defaultWriteScene` / `escalateTo` / `escalateAfter`：写代码默认场景、失败 N 次后转给哪个场景；两者都必须是可写的实现场景，N 必须小于返工轮数上限。
+- `requireReview`：改了代码必须独立审查（默认开）；实际使用的审查模型必须与写代码的模型不同。关掉时这套可以没有审查场景。
+- `defaultWriteScene` / `escalateTo` / `escalateAfter`：写代码默认场景、失败 N 次后转给哪个场景；两者都必须是本套可写的实现场景，N 必须小于返工轮数上限。
 - `maxParallelWriters` / `maxReworkRounds` / `contractFileThreshold`：并行写 Worker 上限、返工轮数上限、必须写契约的文件数阈值。
 
 不可配置、始终生效的规则在 `SKILL.md`：等待不轮询、审查模型必须与实现模型不同、场景之外不换模型、各类操作授权边界等。关闭独立审查时，Chief 会在汇报中写明“本次未经独立审查”。
@@ -69,7 +69,7 @@ CHIEF_SKILL_DIR="$HOME/.agents/skills/chief-t3" bash install.sh
 node scripts/migrate-to-scenes.mjs --apply
 ```
 
-`--apply` 以 `skills/chief-t3/workflows/default.json` 为源写 `~/.chief-t3/config.json`（已存在先备份），把 `~/.t3-tasks/*/workflow.json` 逐个改名为 `workflow.json.bak.<时间>` 并打印与全局配置的模型差异；`~/.chief-t3/workflows/` 原样保留。单份转换用 `node scripts/migrate-to-scenes.mjs <v1.json> [--out <file>]`，`--from` 可指定源。迁移前建议先备份；想先看效果，用临时 HOME 跑：`HOME=$(mktemp -d) node scripts/migrate-to-scenes.mjs --apply`（`CHIEF_CONFIG` 只改全局配置路径，不会阻止 `~/.t3-tasks/*/workflow.json` 被改名）。`--apply` 是一次性动作；重跑会用出厂默认替换 `~/.chief-t3/config.json`（先备份为 `config.json.bak.<时间>`），面板里的自定义修改请从备份恢复或手动合并。
+`--apply` 以 `skills/chief-t3/workflows/default.json` 为源写 `~/.chief-t3/config.json`（v1 先转 v2 再转 v3，v2 包成 `sets.dev`；已存在先备份为 `config.json.bak.<时间>`），不再改动 `~/.t3-tasks` 或 `~/.chief-t3/workflows`（项目配置上一版已迁移过）。单份转换用 `node scripts/migrate-to-scenes.mjs <v1|v2|v3.json> [--out <file>]`，`--from` 可指定源；v3 输入校验后原样输出。迁移前建议先备份；想先看效果，用临时 HOME 跑：`HOME=$(mktemp -d) node scripts/migrate-to-scenes.mjs --apply`。`--apply` 会用转换结果替换 `~/.chief-t3/config.json`，面板里的自定义修改请从备份恢复或手动合并。
 
 ### 配置面板
 
@@ -87,15 +87,19 @@ bash app/build-mac-app.sh        # 生成 ~/Applications/Chief 工作流.app，�
 
 双击「Chief 工作流」会在后台启动面板并用默认浏览器打开；已经在运行时只打开页面。在 Dock 里退出应用会停止它启动的面板。日志在 `~/Library/Logs/chief-panel.log`。应用记录的是生成时的仓库路径和 node 路径，移动仓库或换了 node 安装位置后重新运行一次构建脚本即可；仓库里的代码更新不需要重新构建。
 
-- 顶栏是「Chief 场景配置」，右边是保存 / 撤销修改；保存后下一次派单立即生效。
+- 左栏是场景配置列表：每套显示名称和绑定项目数，默认那套带「默认」徽标；底部「新建」可以起一个空白套（一个空场景，审查先关着），或复制当前这套；下面是「项目」入口。手机上左栏是抽屉，选中后自动收起。
+- 主区顶栏显示当前这套的显示名（可直接改），右边更多菜单里有复制一份 / 设为默认 / 删除；再右边是对整份文件的保存 / 撤销修改。默认那套不能删；删除有项目绑定的套时，二次确认里会列出这些项目，确认后它们改回默认那套。
 - **场景**：收起时一行显示显示名、什么时候用、首选模型、只读 / 可写和备用数量；点开可改显示名、键名、什么时候用、权限、任务类型、汇报字数，以及首选 / 备选 / 兜底三个模型位置（服务商、模型、推理参数；备选和兜底可清空）。底部「添加场景」新建并直接展开；每行可删除（二次确认）。删场景或改键名时，规则里的默认写场景 / 升级目标会同步清空或更新。
-- **规则**：审查开关；写代码默认用哪个场景；同一任务失败几次后转给哪个场景（下拉只列可写的实现场景，另有“不指定 / 不升级”）；并行写 Worker、返工轮数、契约文件数阈值。
-- **高级**：显示名称、配置文件位置、从磁盘重新加载、直接编辑 JSON。还没有全局配置文件时页面显示的是出厂默认，保存后写到 `~/.chief-t3/config.json`（写入时去掉 `$schema`）。
+- **规则**：审查开关；写代码默认用哪个场景；同一任务失败几次后转给哪个场景（下拉只列本套可写的实现场景，另有“不指定 / 不升级”）；并行写 Worker、返工轮数、契约文件数阈值。
+- **项目**：列出 T3 Code 的项目（已归档的折叠），每行一个下拉：跟随默认（当前：某套）或指定某一套。项目列表从 T3 数据库只读取得，只取标题、工作区根目录和归档状态；配置里绑定了但 T3 已读不到的项目单独折起，仍可改回跟随默认。
+- **高级**：整份文件的显示名称、配置文件位置、从磁盘重新加载、直接编辑 JSON。还没有全局配置文件时页面显示的是出厂默认，保存后写到 `~/.chief-t3/config.json`（写入时去掉 `$schema`）。
+- 切换左栏不丢未保存的修改；改动计数和校验问题都算整份文件，点击问题会先切到对应的套或项目页再定位字段。
+- 读到旧格式（v2 单套）时，页面按「开发」一套显示并提示“保存后会转换为新格式”；保存就写 v3 并备份旧文件。
 - **服务商和模型同步自 T3 Code**：读取 T3 的服务商缓存 `~/.t3/caches/<服务商>.json`（只读，只取服务商、模型和可调参数，不读账号、密钥和用量）。改模型时服务商、模型、推理强度等都是下拉选择，选项和 T3 里一致；未启用的服务商标为「未启用」。换模型后新模型不支持的参数会自动去掉。T3 里已经没有的服务商 / 模型 / 参数值会标黄提示，但不阻止保存（缓存可能比 T3 慢一步）。在 T3 里启用新服务商或更新模型后，点「重新读取」即可。读不到缓存时退回手动填写。
 - 校验与 `scripts/validate-workflow.mjs` 相同，问题会标在对应字段和场景行上，底部保存栏列出全部问题，点击可跳到出错处；有问题时不能保存。
 - 保存前备份旧文件为 `*.bak.<时间>`；文件在面板外被改过时拒绝覆盖，需先重新加载。
 - 只监听 127.0.0.1，只能编辑全局配置文件，拒绝跨站请求。
-- 位置可用环境变量覆盖：`CHIEF_CONFIG`（全局配置文件，默认 `~/.chief-t3/config.json`）、`T3CODE_HOME`（T3 数据目录，默认 `~/.t3`）。
+- 位置可用环境变量覆盖：`CHIEF_CONFIG`（全局配置文件，默认 `~/.chief-t3/config.json`）、`T3CODE_HOME`（T3 数据目录，默认 `~/.t3`）、`CHIEF_T3_DB`（T3 数据库路径，测试用）。
 - 保存后下一次派单立即生效；重装技能不会覆盖 `~/.chief-t3/config.json`。
 
 Windows 用 PowerShell 生成桌面快捷方式（PowerShell 5.1+；node 需在 PATH 或常见安装位置，18+）：
